@@ -80,9 +80,11 @@ only send messages. To create it:
 
 1. In https://console.cloud.google.com create a project and enable the **Gmail API**
    (*APIs & Services → Library*).
-2. Under *APIs & Services → OAuth consent screen* configure an **External** app, then
-   publish it (*Audience → Publish app*); a credential of an app left in "Testing" expires
-   after seven days.
+2. Under *APIs & Services → OAuth consent screen* configure an **External** app. In
+   *Branding* set the home page to the dashboard URL, the privacy policy to its
+   `privacy.html` and the authorised domain to the site's `github.io` domain. Then publish
+   it (*Audience → Publish app*); a credential of an app left in "Testing" expires after
+   seven days.
 3. Under *Credentials → Create credentials → OAuth client ID* choose **Desktop app** and
    download its JSON file. Keep it out of the repository.
 4. Run `python -m dolar_market.gmail_auth path/to/client_secret.json OWNER/REPOSITORY`,

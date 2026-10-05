@@ -2,9 +2,10 @@
 
 Usage: python -m dolar_market.dashboard
 
-Writes two files with the same content:
-    dashboard.html   the page body alone, as an artifact host expects it
-    site/index.html  a complete HTML document, served by GitHub Pages
+Writes the dashboard twice, with the same content, plus the privacy policy:
+    dashboard.html     the page body alone, as an artifact host expects it
+    site/index.html    a complete HTML document, served by GitHub Pages
+    site/privacy.html  a copy of privacy.html
 
 Optional environment variables: SUBSCRIBE_URL adds a "subscribe" button and
 CONTACT_EMAIL overrides the address shown in the footer.
@@ -23,6 +24,8 @@ ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE = Path(__file__).with_name("dashboard_template.html")
 FRAGMENT_OUTPUT = ROOT / "dashboard.html"
 SITE_OUTPUT = ROOT / "site" / "index.html"
+PRIVACY_PAGE = Path(__file__).with_name("privacy.html")
+PRIVACY_URL = "https://mrdavid656.github.io/dolar_tracking/privacy.html"
 MARKER = "/*DATA*/"
 CONTACT_EMAIL = "davidgemio98@gmail.com"
 DOCUMENT = """<!doctype html>
@@ -44,12 +47,14 @@ def to_payload(
     sources: Iterable[str],
     subscribe_url: str | None = None,
     contact_email: str | None = CONTACT_EMAIL,
+    privacy_url: str | None = PRIVACY_URL,
 ) -> dict:
     """The structure consumed by the template's JavaScript."""
     return {
         "sources": list(sources),
         "subscribeUrl": subscribe_url or None,
         "contactEmail": contact_email or None,
+        "privacyUrl": privacy_url or None,
         "readings": [
             {
                 "t": reading.timestamp,
@@ -80,6 +85,7 @@ def main() -> None:
     FRAGMENT_OUTPUT.write_text(fragment, encoding="utf-8")
     SITE_OUTPUT.parent.mkdir(exist_ok=True)
     SITE_OUTPUT.write_text(to_document(fragment), encoding="utf-8")
+    (SITE_OUTPUT.parent / PRIVACY_PAGE.name).write_text(PRIVACY_PAGE.read_text(encoding="utf-8"), encoding="utf-8")
     print(f"{len(readings)} readings -> {FRAGMENT_OUTPUT} and {SITE_OUTPUT}")
 
 

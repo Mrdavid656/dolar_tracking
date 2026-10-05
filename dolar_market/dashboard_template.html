@@ -176,7 +176,7 @@ footer p + p { margin-top: 6px; }
 
   <footer>
     <p><span id="footer-text"></span> <a id="contact-link" hidden></a></p>
-    <p data-i18n="disclaimer"></p>
+    <p><span data-i18n="disclaimer"></span> <a id="privacy-link" data-i18n="privacy" hidden></a></p>
     <p id="missing-notice" hidden></p>
   </footer>
 </div>
@@ -221,6 +221,7 @@ const TEXTS = {
     linesAria: "Compra y venta del dólar a lo largo del tiempo",
     candlesAria: weekly => `Velas del precio de venta del dólar por ${weekly ? "semana" : "día"}`,
     footer: "Proyecto personal con fines informativos. Para sugerencias o reportar un error, escribe a",
+    privacy: "Política de privacidad",
     disclaimer: "Sin afiliación con los bancos ni con el BCB. Los datos se toman de sitios públicos y pueden contener errores; no constituyen asesoría financiera.",
     subscribe: "Recibir el resumen diario por correo",
     missing: banks => `Sin datos en la última lectura: ${banks}.`,
@@ -260,6 +261,7 @@ const TEXTS = {
     linesAria: "Dollar buy and sell prices over time",
     candlesAria: weekly => `Dollar sell price candles by ${weekly ? "week" : "day"}`,
     footer: "Personal project for informational purposes. For suggestions or to report an error, write to",
+    privacy: "Privacy policy",
     disclaimer: "Not affiliated with the banks or the BCB. Data comes from public websites and may contain errors; it is not financial advice.",
     subscribe: "Get the daily summary by email",
     missing: banks => `No data in the latest reading: ${banks}.`,
@@ -343,6 +345,9 @@ function renderStaticText() {
   const contactLink = byId("contact-link");
   contactLink.hidden = !DATA.contactEmail;
   if (DATA.contactEmail) { contactLink.href = `mailto:${DATA.contactEmail}`; contactLink.textContent = DATA.contactEmail; }
+  const privacyLink = byId("privacy-link");
+  privacyLink.hidden = !DATA.privacyUrl;
+  if (DATA.privacyUrl) privacyLink.href = DATA.privacyUrl;
   const missingNotice = byId("missing-notice");
   missingNotice.hidden = !missingSources.length;
   missingNotice.textContent = missingSources.length ? text().missing(missingSources.map(displayName).join(", ")) : "";
