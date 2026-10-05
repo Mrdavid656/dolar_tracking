@@ -229,3 +229,5 @@ failing.txt
 
 # OAuth client file from Google Cloud
 client_secret*.json
+
+ignored/
