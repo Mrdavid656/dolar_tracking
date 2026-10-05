@@ -59,21 +59,3 @@ Subscribers' email addresses are used only to send the daily summary. See the
 Suggestions and error reports are welcome at davidgemio98@gmail.com.
 
 Made by David Gemio. Released under the [MIT licence](LICENSE).
-
----
-
-## En español
-
-**Pizarra del Dólar** muestra en un solo lugar cuánto cuesta hoy el dólar en los bancos de
-Bolivia: cuánto paga cada banco por un dólar, cuánto cobra por venderlo, y cómo se comparan
-esos precios con el tipo de cambio oficial del BCB y con el dólar paralelo.
-
-- **Ver el tablero:** https://mrdavid656.github.io/dolar_tracking/
-- **Recibirlo por correo cada mañana:** [suscribirse o darse de baja](https://docs.google.com/forms/d/e/1FAIpQLScOe99KN0www_aZeMoC_0ybw3MhPYlrhZhig9BZoGAecjbihg/viewform)
-
-Los precios se leen tres veces al día (07:00, 13:00 y 19:00, hora de Bolivia) desde el
-sitio público de cada banco, y el resumen por correo sale a las 08:00. El dólar paralelo
-es el precio del USDT en Binance P2P.
-
-Es un proyecto personal con fines informativos, sin afiliación con los bancos ni con el
-BCB. Los datos pueden contener errores y no constituyen asesoría financiera.
