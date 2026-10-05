@@ -1,185 +1,79 @@
-# dolar_market
+# Pizarra del Dólar
 
-Tracks the dollar exchange rate published by the BCB, 11 Bolivian banks and the parallel
-market. Three times a day it stores a reading in `data/rates.csv` and republishes a
-dashboard; once a day it emails a summary to every subscriber.
+![Pizarra del Dólar](dolar_market/static/og.png)
 
-- Dashboard: https://mrdavid656.github.io/dolar_tracking/
-- Readings: 07:00, 13:00 and 19:00 Bolivia time
-- Email: 08:00 Bolivia time. [Subscribe or unsubscribe](https://docs.google.com/forms/d/e/1FAIpQLScOe99KN0www_aZeMoC_0ybw3MhPYlrhZhig9BZoGAecjbihg/viewform)
+**Pizarra del Dólar** ("Dollar Board") shows, in one place, what the US dollar costs at
+Bolivian banks today: what each bank pays for a dollar, what it charges for one, and how
+those prices compare with the official rate of the Central Bank of Bolivia (BCB) and with
+the parallel market.
 
-## Conventions
+- **See the board:** https://mrdavid656.github.io/dolar_tracking/
+- **Get it by email every morning:** [subscribe or unsubscribe](https://docs.google.com/forms/d/e/1FAIpQLScOe99KN0www_aZeMoC_0ybw3MhPYlrhZhig9BZoGAecjbihg/viewform)
 
-- Code, comments, identifiers, file names, commit messages and docs are written in English.
-- Text shown to the reader (dashboard, email) is bilingual: Spanish and English.
-  Every user-facing string lives in a translation table (`TEXTS` in
-  `dashboard_template.html` and in `mailer.py`); add both languages when adding a string.
-- "Buy" is what a bank pays for a dollar and "sell" what it charges. The best deal is
-  therefore the **highest** buy and the **lowest** sell.
+## What you will find
 
-## Local usage
+- **Best deal today:** the bank that sells the dollar cheapest and the bank that pays the
+  most for it.
+- **Buy and sell by bank:** every bank on the same scale, next to the official and the
+  parallel rate.
+- **History:** how each bank's prices have moved, as lines or as daily and weekly candles.
+- **Spanish and English**, with a switch at the top of the page.
 
-```
-pip install -r requirements-dev.txt
-python -m dolar_market.scrape             # append one reading to the CSV
-python -m dolar_market.mailer --preview   # write email_preview.html without sending
-python -m dolar_market.dashboard          # generate dashboard.html and site/index.html
-python -m dolar_market.backfill           # add the sources missing from the latest reading
-python -m pytest                          # run the tests
-```
+Prices are read three times a day, at 07:00, 13:00 and 19:00 (Bolivia time). The email
+summary goes out at 08:00.
 
-## Dataset
+## Where the prices come from
 
-`data/rates.csv` holds one row per source and reading, in bolivianos per dollar:
+Each bank's own public website: BNB, BCP, BISA, Mercantil Santa Cruz, Banco Unión,
+Ganadero, Económico, FIE, BancoSol, Fortaleza and Prodem. The official rate comes from the
+BCB. The parallel rate is the price of USDT in bolivianos on Binance P2P; the board shows
+the midpoint between its buy and sell prices.
 
-| column | content |
+## The data
+
+Every reading is kept in [`data/rates.csv`](data/rates.csv), one row per source, in
+bolivianos per dollar. You are welcome to use it.
+
+| column | meaning |
 |---|---|
-| `timestamp` | moment of the reading, ISO 8601 with the -04:00 offset |
-| `bank` | name of the source |
-| `buy` | what the bank pays for one dollar (empty if not published) |
-| `sell` | what the bank charges for one dollar |
-| `official` | official exchange rate shown on that site |
+| `timestamp` | when the reading was taken (Bolivia time) |
+| `bank` | the source; `BCB` is the official rate and `Parallel` the parallel market |
+| `buy` | what the bank pays you for one dollar |
+| `sell` | what the bank charges you for one dollar |
+| `official` | the official rate shown on that bank's site |
 
-Two sources are references rather than banks: `BCB` (the official rate) and `Parallel`
-(USDT/BOB on Binance P2P, as aggregated by CriptoYa). The dashboard and the email show
-them as reference lines; the parallel rate displayed is the midpoint of its buy and sell.
+An empty cell means the source does not publish that value.
 
-## Automation with GitHub Actions
+## Please note
 
-| workflow | when | what |
-|---|---|---|
-| `rates.yml` | 07:00, 13:00, 19:00 Bolivia time, and on pushes that change data or code | take a reading, commit it, report failing sources, publish the dashboard to GitHub Pages |
-| `email.yml` | 08:00 Bolivia time | email the latest reading to the subscribers |
-| `tests.yml` | pushes and pull requests | run the test suite |
+This is a personal project for informational purposes. It is not affiliated with any bank
+or with the BCB. The figures are collected automatically from public websites and may
+contain errors or arrive late; they are not financial advice. Always confirm a price with
+the bank before acting on it.
 
-Settings, under *Settings → Secrets and variables → Actions*:
+Subscribers' email addresses are used only to send the daily summary. See the
+[privacy policy](https://mrdavid656.github.io/dolar_tracking/privacy.html).
 
-| name | kind | purpose |
-|---|---|---|
-| `GMAIL_USER` | secret | Gmail address that sends the email |
-| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | secrets | send-only Gmail API credential (preferred; see below) |
-| `GMAIL_APP_PASSWORD` | secret | app password, used only when no API credential is set |
-| `MAIL_TO` | secret, optional | comma-separated recipients who always get the email |
-| `SUBSCRIBERS_URL` | secret, optional | published CSV with the sign-up form's responses |
-| `UNSUBSCRIBE_URL` | variable, optional | form link pre-filled to unsubscribe, with `{email}` as placeholder |
-| `MAIL_LANG` | variable, optional | email language, `es` (default) or `en` |
-| `SUBSCRIBE_URL` | variable, optional | sign-up form linked from the dashboard |
+## Contact
 
-The email is not sent when the latest reading is more than six hours old or when the list
-has more than 200 recipients (`MAIL_MAX_RECIPIENTS` raises that limit); the workflow fails
-instead, and GitHub notifies the repository owner. Messages go out ten at a time with a
-30-second pause between batches.
+Suggestions and error reports are welcome at davidgemio98@gmail.com.
 
-To try the email without reaching the subscribers, run the *Daily email* workflow by hand
-with `only_to` set to your address, or with `check_only` ticked to send nothing at all.
+Made by David Gemio. Released under the [MIT licence](LICENSE).
 
-### Send-only Gmail credential
+---
 
-An app password opens the whole mailbox to whoever holds it. The Gmail API credential can
-only send messages. To create it:
+## En español
 
-1. In https://console.cloud.google.com create a project and enable the **Gmail API**
-   (*APIs & Services → Library*).
-2. Under *APIs & Services → OAuth consent screen* configure an **External** app. In
-   *Branding* set the home page to the dashboard URL, the privacy policy to its
-   `privacy.html` and the authorised domain to the site's `github.io` domain. Then publish
-   it (*Audience → Publish app*); a credential of an app left in "Testing" expires after
-   seven days.
-3. Under *Credentials → Create credentials → OAuth client ID* choose **Desktop app** and
-   download its JSON file. Keep it out of the repository.
-4. Run `python -m dolar_market.gmail_auth path/to/client_secret.json OWNER/REPOSITORY`,
-   approve "Send email on your behalf" in the browser, and the three secrets are stored.
-5. Delete the `GMAIL_APP_PASSWORD` secret and revoke the app password in your Google account.
+**Pizarra del Dólar** muestra en un solo lugar cuánto cuesta hoy el dólar en los bancos de
+Bolivia: cuánto paga cada banco por un dólar, cuánto cobra por venderlo, y cómo se comparan
+esos precios con el tipo de cambio oficial del BCB y con el dólar paralelo.
 
-### Subscribers
+- **Ver el tablero:** https://mrdavid656.github.io/dolar_tracking/
+- **Recibirlo por correo cada mañana:** [suscribirse o darse de baja](https://docs.google.com/forms/d/e/1FAIpQLScOe99KN0www_aZeMoC_0ybw3MhPYlrhZhig9BZoGAecjbihg/viewform)
 
-People subscribe and unsubscribe on their own through one Google Form; nobody maintains
-the list by hand. Every morning the workflow reads the form's responses in order and the
-most recent answer of each address decides whether it is subscribed. A new subscriber
-starts receiving the email at the next 08:00. Each recipient gets an individual message
-with a personal "unsubscribe" link that opens the form already filled in.
+Los precios se leen tres veces al día (07:00, 13:00 y 19:00, hora de Bolivia) desde el
+sitio público de cada banco, y el resumen por correo sale a las 08:00. El dólar paralelo
+es el precio del USDT en Binance P2P.
 
-One-time setup:
-
-1. Create a Google Form with two required questions:
-   - a short-answer question for the email address (turn on response validation: *Text → Email*);
-   - a multiple-choice question with the options `Suscribirme` and `Darme de baja`.
-     An answer starting with "unsubscribe", "cancel", "baja", "darme de baja", "desuscri"
-     or "dejar de" removes the address; anything else subscribes it.
-2. In the *Responses* tab choose *Link to Sheets*.
-3. In that sheet choose *File → Share → Publish to web*, pick the responses tab and the
-   *CSV* format, and publish. Store the resulting link in the secret `SUBSCRIBERS_URL`.
-   Keep it secret: anyone holding that link can read the subscribers' addresses.
-4. In the form choose *⋮ → Get pre-filled link*, type `EMAIL` as the address, select
-   `Darme de baja` and copy the link. Replace `EMAIL` with `{email}` and store the result
-   in the variable `UNSUBSCRIBE_URL`.
-5. Store the form's normal link in the variable `SUBSCRIBE_URL`; the dashboard then shows
-   a link to it.
-
-The form only ever appends rows. To keep the sheet to at most one row per address, paste
-`scripts/clean_subscribers.gs` into the sheet (*Extensions → Apps Script*) and run
-`installTriggers` once. On every submission it deletes the rows an address has superseded,
-and it deletes an unsubscription row three days after it was sent. This never changes who
-receives the email.
-
-Addresses listed in `MAIL_TO` always receive the email, whatever the form says. Nothing
-verifies that the person filling in the form owns the address, so anyone could subscribe
-or unsubscribe someone else; to prevent that, turn on *Collect email addresses → Verified*
-in the form's settings, which makes respondents sign in with Google.
-
-### Failing sources
-
-When a source is missing from the last three readings, `rates.yml` opens an issue labelled
-`source-down`, and closes it once the source answers again.
-
-## Backfill from a local computer
-
-Some sites refuse connections from GitHub's servers. `scripts/register_backfill_task.ps1`
-registers a Windows scheduled task that, shortly after each reading, queries from your
-computer only the sources that reading lacks and pushes them with the reading's timestamp.
-It does nothing when the reading is complete, and skips readings older than three hours.
-
-```
-.\scripts\register_backfill_task.ps1
-Unregister-ScheduledTask -TaskName DolarTrackingBackfill   # to remove it
-```
-
-## Security
-
-- The sender's app password and the subscribers' sheet link live in repository secrets;
-  pull requests from forks cannot read them.
-- GitHub Actions are pinned to a commit and only GitHub's own actions are allowed to run.
-  Dependabot opens a pull request when a pinned action or package has a new version.
-- `main` cannot be force-pushed or deleted.
-- The email is sent with a Gmail API credential limited to sending; unlike an app
-  password, it cannot read the mailbox.
-
-## Code structure
-
-Pure functions (they transform data and touch nothing external) are kept apart from
-effects (network, disk, clock, email), which sit at the edges of each module.
-
-| module | content |
-|---|---|
-| `models.py` | immutable types: `Quote`, `Row`, `Reading` |
-| `sources.py` | `SOURCES`: each source as a URL plus a pure parser (`from_html`, `from_json`) |
-| `storage.py` | read and write the CSV; group rows into readings |
-| `analysis.py` | questions about readings: references, best deals, failing sources |
-| `scrape.py` | query the sources, validate and save |
-| `backfill.py` | query only the sources the latest reading lacks |
-| `monitor.py` | list the sources that keep failing |
-| `mailer.py` | build the summary HTML and send it |
-| `gmail_api.py` | send through the Gmail API with a send-only credential |
-| `gmail_auth.py` | one-time helper that creates that credential |
-| `dashboard.py` | embed the readings into `dashboard_template.html` |
-
-## Adding or fixing a source
-
-Each source is one entry of `SOURCES` in `dolar_market/sources.py`: a URL plus the patterns
-to search for (`from_html`) or a function that reads the JSON (`from_json`). After changing
-one, refresh its saved response and expected values, then run the tests:
-
-```
-python -m tests.capture_fixtures "Banco Unión"
-python -m pytest
-```
+Es un proyecto personal con fines informativos, sin afiliación con los bancos ni con el
+BCB. Los datos pueden contener errores y no constituyen asesoría financiera.
