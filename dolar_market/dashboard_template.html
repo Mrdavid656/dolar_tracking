@@ -107,6 +107,7 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #history { min-height: 120px; }
 #history svg { display: block; width: 100%; height: auto; }
 #history text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
+#history text.end-value { font-size: 12px; font-weight: 500; }
 #history .legend { padding: 6px 0 2px; }
 .note { color: var(--ink-2); font-size: 13px; margin: 10px 0 0; text-align: center; text-wrap: balance; }
 .empty { color: var(--ink-2); margin: 0; padding: 36px 0 28px; text-align: center; text-wrap: balance; }
@@ -548,7 +549,7 @@ function drawLines(points) {
   const values = points.flatMap(p => [p.buy, p.sell, p.official, p.parallel]).filter(v => v != null);
   if (!values.length) { historyPanel.innerHTML = `<p class="empty">${text().noBankData}</p>`; return; }
   const width = chartWidth(), height = CHART_HEIGHT;
-  const margin = { top: 16, right: 16, bottom: 28, left: 44 };
+  const margin = { top: 16, right: 50, bottom: 28, left: 44 };
   const domain = yDomain(values);
   const firstMs = points[0].ms, lastMs = points[points.length - 1].ms;
   const x = ms => margin.left + (ms - firstMs) / (lastMs - firstMs || 1) * (width - margin.left - margin.right);
@@ -569,6 +570,13 @@ function drawLines(points) {
   const lastWith = key => [...points].reverse().find(p => p[key] != null);
   const series = [["sell", text().sell, "var(--sell)"], ["buy", text().buy, "var(--buy)"]]
     .map(([key, name, color]) => ({ key, name, color, point: lastWith(key) })).filter(s => s.point);
+  // nudge the end values apart when they would overlap
+  series.forEach(s => { s.labelY = y(s.point[s.key]); });
+  if (series.length === 2 && Math.abs(series[0].labelY - series[1].labelY) < 14) {
+    const middle = (series[0].labelY + series[1].labelY) / 2;
+    const upper = series[0].labelY <= series[1].labelY ? 0 : 1;
+    series[upper].labelY = middle - 7; series[1 - upper].labelY = middle + 7;
+  }
   const legend = [...series.map(s => [s.key, s.name]), ["official", text().officialLabel], ["parallel", text().parallelLabel]]
     .filter(([key]) => points.some(p => p[key] != null))
     .map(([key, name]) => `<span><i class="key line ${key}"></i>${name}</span>`).join("");
@@ -577,7 +585,8 @@ function drawLines(points) {
     <path d="${path("official")}" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.7"/>
     <path d="${path("parallel")}" fill="none" stroke="var(--parallel)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.9"/>
     ${series.map(s => `<path d="${path(s.key)}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-      <circle cx="${x(s.point.ms)}" cy="${y(s.point[s.key])}" r="4.5" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`).join("")}
+      <circle cx="${x(s.point.ms)}" cy="${y(s.point[s.key])}" r="4.5" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>
+      <text class="end-value" x="${width - margin.right + 10}" y="${s.labelY + 4}" style="fill:${s.color}">${formatNumber(s.point[s.key])}</text>`).join("")}
     <line id="crosshair" y1="${margin.top}" y2="${height - margin.bottom}" stroke="var(--axis)" stroke-width="1" visibility="hidden"/>
   </svg>`;
   const svg = historyPanel.querySelector("svg"), crosshair = historyPanel.querySelector("#crosshair");
