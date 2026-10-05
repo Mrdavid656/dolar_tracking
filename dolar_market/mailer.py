@@ -11,7 +11,10 @@ MAX_RECIPIENTS (a flooded sign-up form must not turn this account into a spammer
 Messages go out in small batches with a pause in between.
 
 Environment variables:
-    GMAIL_USER, GMAIL_APP_PASSWORD  sender account and its app password
+    GMAIL_USER       the Gmail address that sends the email
+    GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN
+                     send-only Gmail API credential (see gmail_auth.py); preferred
+    GMAIL_APP_PASSWORD  app password, used only when no API credential is set
     MAIL_TO          optional; comma-separated recipients who always get it
     SUBSCRIBERS_URL  optional; URL of the CSV with the sign-up form's responses
                      (a Google Sheet published to the web)
@@ -42,7 +45,7 @@ import re
 import smtplib
 import sys
 import time
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
@@ -50,6 +53,8 @@ from typing import NamedTuple
 from urllib.parse import quote
 
 import requests
+
+from . import gmail_api
 
 from .analysis import (
     Deal,
@@ -590,27 +595,48 @@ def fetch_sheet(url: str | None) -> str:
     return response.content.decode("utf-8", errors="replace")
 
 
-def send_batch(messages: Iterable[EmailMessage], user: str, password: str) -> tuple[int, int]:
-    """Send a few messages over one connection. Returns (delivered, refused)."""
-    delivered = refused = 0
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-        smtp.login(user, password)
-        for message in messages:
-            try:
-                smtp.send_message(message)
-                delivered += 1
-            except smtplib.SMTPRecipientsRefused:  # one bad address must not stop the rest
-                refused += 1
-    return delivered, refused
+Sender = Callable[[Sequence[EmailMessage]], tuple[int, int]]  # batch -> (delivered, refused)
+
+
+def smtp_sender(user: str, password: str) -> Sender:
+    """Sender that logs in to Gmail's SMTP server with an app password."""
+
+    def send(batch: Sequence[EmailMessage]) -> tuple[int, int]:
+        delivered = refused = 0
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(user, password)
+            for message in batch:
+                try:
+                    smtp.send_message(message)
+                    delivered += 1
+                except smtplib.SMTPRecipientsRefused:  # one bad address must not stop the rest
+                    refused += 1
+        return delivered, refused
+
+    return send
+
+
+def api_sender(client_id: str, client_secret: str, refresh_token: str) -> Sender:
+    """Sender that uses the Gmail API with a send-only credential."""
+
+    def send(batch: Sequence[EmailMessage]) -> tuple[int, int]:
+        return gmail_api.send_batch(batch, gmail_api.fetch_access_token(client_id, client_secret, refresh_token))
+
+    return send
+
+
+def sender_from(env: Mapping[str, str]) -> Sender:
+    """Prefer the send-only API credential; fall back to the app password."""
+    if env.get("GMAIL_REFRESH_TOKEN"):
+        return api_sender(env["GMAIL_CLIENT_ID"], env["GMAIL_CLIENT_SECRET"], env["GMAIL_REFRESH_TOKEN"])
+    return smtp_sender(env["GMAIL_USER"], env["GMAIL_APP_PASSWORD"])
 
 
 def send_all(
     messages: Sequence[EmailMessage],
-    user: str,
-    password: str,
+    send: Sender,
     batch_size: int = BATCH_SIZE,
     pause_seconds: float = BATCH_PAUSE_SECONDS,
-    send=send_batch,
     pause=time.sleep,
 ) -> tuple[int, int]:
     """Send the messages in batches, pausing between them. Returns (delivered, refused)."""
@@ -618,7 +644,7 @@ def send_all(
     for index, batch in enumerate(batches(messages, batch_size)):
         if index:
             pause(pause_seconds)
-        sent, rejected = send(batch, user, password)
+        sent, rejected = send(batch)
         delivered, refused = delivered + sent, refused + rejected
     return delivered, refused
 
@@ -653,7 +679,7 @@ def main() -> None:
         to_message(build(readings, SOURCES, lang, dashboard_url, link), user, recipient, link)
         for recipient, link in zip(recipients, links)
     )
-    delivered, refused = send_all(messages, user, env["GMAIL_APP_PASSWORD"])
+    delivered, refused = send_all(messages, sender_from(env))
     print(f"Email sent to {delivered} recipient(s); {refused} refused")
 
 

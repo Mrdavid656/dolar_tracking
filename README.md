@@ -57,7 +57,8 @@ Settings, under *Settings → Secrets and variables → Actions*:
 | name | kind | purpose |
 |---|---|---|
 | `GMAIL_USER` | secret | Gmail address that sends the email |
-| `GMAIL_APP_PASSWORD` | secret | its app password (https://myaccount.google.com/apppasswords) |
+| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | secrets | send-only Gmail API credential (preferred; see below) |
+| `GMAIL_APP_PASSWORD` | secret | app password, used only when no API credential is set |
 | `MAIL_TO` | secret, optional | comma-separated recipients who always get the email |
 | `SUBSCRIBERS_URL` | secret, optional | published CSV with the sign-up form's responses |
 | `UNSUBSCRIBE_URL` | variable, optional | form link pre-filled to unsubscribe, with `{email}` as placeholder |
@@ -71,6 +72,22 @@ instead, and GitHub notifies the repository owner. Messages go out ten at a time
 
 To try the email without reaching the subscribers, run the *Daily email* workflow by hand
 with `only_to` set to your address, or with `check_only` ticked to send nothing at all.
+
+### Send-only Gmail credential
+
+An app password opens the whole mailbox to whoever holds it. The Gmail API credential can
+only send messages. To create it:
+
+1. In https://console.cloud.google.com create a project and enable the **Gmail API**
+   (*APIs & Services → Library*).
+2. Under *APIs & Services → OAuth consent screen* configure an **External** app, then
+   publish it (*Audience → Publish app*); a credential of an app left in "Testing" expires
+   after seven days.
+3. Under *Credentials → Create credentials → OAuth client ID* choose **Desktop app** and
+   download its JSON file. Keep it out of the repository.
+4. Run `python -m dolar_market.gmail_auth path/to/client_secret.json OWNER/REPOSITORY`,
+   approve "Send email on your behalf" in the browser, and the three secrets are stored.
+5. Delete the `GMAIL_APP_PASSWORD` secret and revoke the app password in your Google account.
 
 ### Subscribers
 
@@ -132,8 +149,8 @@ Unregister-ScheduledTask -TaskName DolarTrackingBackfill   # to remove it
 - GitHub Actions are pinned to a commit and only GitHub's own actions are allowed to run.
   Dependabot opens a pull request when a pinned action or package has a new version.
 - `main` cannot be force-pushed or deleted.
-- Use a Gmail account created for this purpose as the sender, not a personal one: an app
-  password grants access to the whole mailbox.
+- The email is sent with a Gmail API credential limited to sending; unlike an app
+  password, it cannot read the mailbox.
 
 ## Code structure
 
@@ -150,6 +167,8 @@ effects (network, disk, clock, email), which sit at the edges of each module.
 | `backfill.py` | query only the sources the latest reading lacks |
 | `monitor.py` | list the sources that keep failing |
 | `mailer.py` | build the summary HTML and send it |
+| `gmail_api.py` | send through the Gmail API with a send-only credential |
+| `gmail_auth.py` | one-time helper that creates that credential |
 | `dashboard.py` | embed the readings into `dashboard_template.html` |
 
 ## Adding or fixing a source

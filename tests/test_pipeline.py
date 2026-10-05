@@ -166,15 +166,45 @@ def test_stale_readings_and_oversized_lists_block_the_send():
 def test_messages_are_sent_in_batches_with_a_pause_between_them():
     sent, pauses = [], []
 
-    def fake_send(batch, user, password):
+    def fake_send(batch):
         sent.append(len(batch))
         return len(batch) - 1, 1
 
-    result = mailer.send_all(tuple(range(25)), "u", "p", batch_size=10, pause_seconds=30, send=fake_send, pause=pauses.append)
+    result = mailer.send_all(tuple(range(25)), fake_send, batch_size=10, pause_seconds=30, pause=pauses.append)
     assert sent == [10, 10, 5]
     assert pauses == [30, 30]  # between batches only, never after the last
     assert result == (22, 3)
     assert mailer.batches((), 10) == ()
+
+
+def test_gmail_api_payload_decodes_back_to_the_message():
+    import base64
+    from email import message_from_bytes
+
+    from dolar_market import gmail_api
+
+    email = mailer.build(READINGS, ["Alpha"], "es")
+    message = mailer.to_message(email, "me@example.com", "ana@example.com")
+    decoded = message_from_bytes(base64.urlsafe_b64decode(gmail_api.to_raw(message)))
+    assert decoded["To"] == "ana@example.com"
+    assert decoded.is_multipart()
+
+
+def test_consent_asks_only_for_permission_to_send():
+    from dolar_market import gmail_auth
+
+    url = gmail_auth.consent_url("client-id", "http://127.0.0.1:5000", "state")
+    assert "scope=https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.send&" in url
+    assert "access_type=offline" in url
+
+
+def test_the_send_only_credential_is_preferred_over_the_app_password(monkeypatch):
+    used = []
+    monkeypatch.setattr(mailer, "api_sender", lambda *args: used.append("api") or "api")
+    monkeypatch.setattr(mailer, "smtp_sender", lambda *args: used.append("smtp") or "smtp")
+    both = {"GMAIL_USER": "u", "GMAIL_APP_PASSWORD": "p", "GMAIL_CLIENT_ID": "i", "GMAIL_CLIENT_SECRET": "s", "GMAIL_REFRESH_TOKEN": "r"}
+    assert mailer.sender_from(both) == "api"
+    assert mailer.sender_from({"GMAIL_USER": "u", "GMAIL_APP_PASSWORD": "p"}) == "smtp"
 
 
 # --- dashboard ---
