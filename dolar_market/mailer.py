@@ -3,6 +3,7 @@
 Usage:
     python -m dolar_market.mailer            # send the email
     python -m dolar_market.mailer --preview  # only write email_preview.html
+    python -m dolar_market.mailer --check    # only report who would receive it
 
 Environment variables:
     GMAIL_USER, GMAIL_APP_PASSWORD  sender account and its app password
@@ -207,6 +208,23 @@ def subscribers_from_sheet(sheet: str | None) -> tuple[str, ...]:
 def recipients_for(always: str | None, sheet: str | None) -> tuple[str, ...]:
     """The fixed recipients followed by the current subscribers, without repeats."""
     return tuple(dict.fromkeys((*addresses_in(always), *subscribers_from_sheet(sheet))))
+
+
+def describe_sheet(sheet: str | None) -> str:
+    """One line about the form responses, without revealing any address."""
+    if not sheet:
+        return "Form responses: none configured or empty."
+    if sheet.lstrip().lower().startswith(("<!doctype", "<html")):
+        return (
+            "Form responses: SUBSCRIBERS_URL returned a web page, not CSV. "
+            "Publish the responses sheet to the web as CSV and store that link."
+        )
+    rows = tuple(csv.reader(io.StringIO(sheet)))
+    with_address = sum(1 for cells in rows if addresses_in(" ".join(cells)))
+    return (
+        f"Form responses: {len(rows)} rows, {with_address} with an address, "
+        f"{len(subscribers_from_sheet(sheet))} currently subscribed."
+    )
 
 
 def unsubscribe_link(template: str | None, recipient: str) -> str | None:
@@ -511,7 +529,12 @@ def main() -> None:
         print(email.subject)
         return
     user = env["GMAIL_USER"]
-    recipients = recipients_for(env.get("MAIL_TO"), fetch_sheet(env.get("SUBSCRIBERS_URL"))) or (user,)
+    sheet = fetch_sheet(env.get("SUBSCRIBERS_URL"))
+    recipients = recipients_for(env.get("MAIL_TO"), sheet) or (user,)
+    print(describe_sheet(sheet))
+    if "--check" in sys.argv:
+        print(f"{len(recipients)} recipient(s) would receive the email; nothing was sent.")
+        return
     links = tuple(unsubscribe_link(env.get("UNSUBSCRIBE_URL"), recipient) for recipient in recipients)
     messages = (
         to_message(build(readings, SOURCES, lang, dashboard_url, link), user, recipient, link)

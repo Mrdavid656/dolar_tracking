@@ -112,6 +112,13 @@ def test_an_address_that_subscribes_many_times_is_listed_once():
     assert mailer.recipients_for("ana@example.com", sheet) == ("ana@example.com",)
 
 
+def test_describe_sheet_counts_without_revealing_addresses():
+    summary = mailer.describe_sheet(SHEET)
+    assert summary == "Form responses: 7 rows, 5 with an address, 2 currently subscribed."
+    assert "@" not in summary
+    assert "not CSV" in mailer.describe_sheet("<!DOCTYPE html><html>Sign in</html>")
+
+
 def test_last_form_answer_decides_the_subscription():
     assert mailer.subscribers_from_sheet(SHEET) == ("luis@example.org", "eva@example.com")
     assert mailer.subscribers_from_sheet(None) == ()

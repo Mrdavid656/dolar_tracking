@@ -6,6 +6,11 @@ on:
   schedule:
     - cron: "0 12 * * *" # 08:00 Bolivia time (UTC-4)
   workflow_dispatch:
+    inputs:
+      check_only:
+        description: Only report who would receive the email; send nothing
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,4 +36,4 @@ jobs:
           MAIL_LANG: ${{ vars.MAIL_LANG }}
         run: |
           export DASHBOARD_URL="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/"
-          python -m dolar_market.mailer
+          python -m dolar_market.mailer ${{ inputs.check_only && '--check' || '' }}
