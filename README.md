@@ -64,6 +64,11 @@ Settings, under *Settings → Secrets and variables → Actions*:
 | `MAIL_LANG` | variable, optional | email language, `es` (default) or `en` |
 | `SUBSCRIBE_URL` | variable, optional | sign-up form linked from the dashboard |
 
+The email is not sent when the latest reading is more than six hours old or when the list
+has more than 200 recipients (`MAIL_MAX_RECIPIENTS` raises that limit); the workflow fails
+instead, and GitHub notifies the repository owner. Messages go out ten at a time with a
+30-second pause between batches.
+
 To try the email without reaching the subscribers, run the *Daily email* workflow by hand
 with `only_to` set to your address, or with `check_only` ticked to send nothing at all.
 
@@ -119,6 +124,16 @@ It does nothing when the reading is complete, and skips readings older than thre
 .\scripts\register_backfill_task.ps1
 Unregister-ScheduledTask -TaskName DolarTrackingBackfill   # to remove it
 ```
+
+## Security
+
+- The sender's app password and the subscribers' sheet link live in repository secrets;
+  pull requests from forks cannot read them.
+- GitHub Actions are pinned to a commit and only GitHub's own actions are allowed to run.
+  Dependabot opens a pull request when a pinned action or package has a new version.
+- `main` cannot be force-pushed or deleted.
+- Use a Gmail account created for this purpose as the sender, not a personal one: an app
+  password grants access to the whole mailbox.
 
 ## Code structure
 

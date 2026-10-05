@@ -5,6 +5,11 @@ Usage:
     python -m dolar_market.mailer --preview  # only write email_preview.html
     python -m dolar_market.mailer --check    # only report who would receive it
 
+Safeguards: nothing is sent when the latest reading is older than MAX_READING_AGE
+(the email must never present stale prices as today's) or when the list exceeds
+MAX_RECIPIENTS (a flooded sign-up form must not turn this account into a spammer).
+Messages go out in small batches with a pause in between.
+
 Environment variables:
     GMAIL_USER, GMAIL_APP_PASSWORD  sender account and its app password
     MAIL_TO          optional; comma-separated recipients who always get it
@@ -15,6 +20,7 @@ Environment variables:
     MAIL_ONLY_TO     optional; send only to these addresses, ignoring the
                      subscribers (for trying the email out)
     MAIL_LANG        optional; "es" or "en" (defaults to "es")
+    MAIL_MAX_RECIPIENTS  optional; overrides MAX_RECIPIENTS
     DASHBOARD_URL    optional; adds a button linking to the live dashboard
 
 Subscribing and unsubscribing are both answers to one form. The responses are
@@ -35,8 +41,9 @@ import os
 import re
 import smtplib
 import sys
+import time
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from pathlib import Path
 from typing import NamedTuple
@@ -59,6 +66,10 @@ from .sources import PARALLEL_SOURCE, SOURCES
 from .storage import read_readings
 
 NO_DATA = Quote()
+MAX_RECIPIENTS = 200
+MAX_READING_AGE = timedelta(hours=6)
+BATCH_SIZE = 10  # messages per connection
+BATCH_PAUSE_SECONDS = 30  # wait between batches, to send at a gentle rate
 DEFAULT_LANG = "es"
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 # A form answer starting with one of these means "take me off the list".
@@ -110,10 +121,13 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         ),
         "missing": "Sin datos en esta lectura: {banks}",
         "open_dashboard": "Ver el tablero completo",
+        "disclaimer": (
+            "Proyecto personal con fines informativos, sin afiliación con los bancos ni con el BCB. "
+            "Los datos se toman de sitios públicos y pueden contener errores; no constituyen asesoría financiera."
+        ),
         "subscribed": "Recibes este correo porque te suscribiste.",
         "unsubscribe": "Darme de baja",
         "subject": "Dólar Bolivia {date}: venta desde Bs {sell}, compra hasta Bs {buy}",
-        "plain": "Tu cliente de correo no muestra HTML.",
     },
     "en": {
         "decimal": ".",
@@ -140,10 +154,13 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         ),
         "missing": "No data in this reading: {banks}",
         "open_dashboard": "Open the full dashboard",
+        "disclaimer": (
+            "Personal project for informational purposes, not affiliated with the banks or the BCB. "
+            "Data comes from public websites and may contain errors; it is not financial advice."
+        ),
         "subscribed": "You receive this email because you subscribed.",
         "unsubscribe": "Unsubscribe",
         "subject": "Bolivia dollar {date}: sell from Bs {sell}, buy up to Bs {buy}",
-        "plain": "Your email client does not display HTML.",
     },
 }
 
@@ -227,6 +244,33 @@ def describe_sheet(sheet: str | None) -> str:
         f"Form responses: {len(rows)} rows, {with_address} with an address, "
         f"{len(subscribers_from_sheet(sheet))} currently subscribed."
     )
+
+
+def is_fresh(reading: Reading, now: datetime, max_age: timedelta = MAX_READING_AGE) -> bool:
+    return now - datetime.fromisoformat(reading.timestamp) <= max_age
+
+
+def blocking_problem(
+    reading: Reading,
+    recipient_count: int,
+    now: datetime,
+    max_recipients: int = MAX_RECIPIENTS,
+    max_age: timedelta = MAX_READING_AGE,
+) -> str | None:
+    """Why the email must not go out, or None when it is safe to send."""
+    if not is_fresh(reading, now, max_age):
+        return f"The latest reading ({reading.timestamp}) is older than {max_age}; not sending stale prices."
+    if recipient_count > max_recipients:
+        return (
+            f"{recipient_count} recipients exceed the limit of {max_recipients}; nothing was sent. "
+            "Check the sign-up sheet for abuse, or raise MAIL_MAX_RECIPIENTS."
+        )
+    return None
+
+
+def batches(items: Sequence, size: int) -> tuple[tuple, ...]:
+    """Split a sequence into consecutive groups of at most `size` items."""
+    return tuple(tuple(items[start : start + size]) for start in range(0, len(items), size))
 
 
 def unsubscribe_link(template: str | None, recipient: str) -> str | None:
@@ -412,6 +456,45 @@ def subscription_html(unsubscribe_url: str | None, text: Mapping[str, str]) -> s
     )
 
 
+def plain_text(
+    latest: Reading,
+    sources: Iterable[str],
+    text: Mapping[str, str],
+    date: str,
+    dashboard_url: str | None,
+    unsubscribe_url: str | None,
+) -> str:
+    """The same content as the HTML, for clients and filters that read plain text."""
+    banks = priced_banks(latest)
+    cheapest, best_paying = best_sell(banks), best_buy(banks)
+    missing = missing_sources(latest, sources)
+    lines = (
+        text["title"],
+        text["reading"].format(date=date),
+        "",
+        f'{text["official"]}: Bs {fmt(official_of(latest), text)}',
+        f'{text["parallel"]}: Bs {fmt(parallel_of(latest), text)}',
+        "",
+        text["best_deal"],
+        f'- {text["to_buy"]}: {", ".join(cheapest.banks) or "—"} '
+        f'({text["to_buy_detail"].format(price=fmt(cheapest.price, text))})',
+        f'- {text["to_sell"]}: {", ".join(best_paying.banks) or "—"} '
+        f'({text["to_sell_detail"].format(price=fmt(best_paying.price, text))})',
+        "",
+        text["by_bank"],
+        *(
+            f'- {bank}: {text["buy"]} {fmt(q.buy, text)} / {text["sell"]} {fmt(q.sell, text)}'
+            for bank, q in banks
+        ),
+        *(("", text["missing"].format(banks=", ".join(display_name(s, text) for s in missing))) if missing else ()),
+        *(("", f'{text["open_dashboard"]}: {dashboard_url}') if dashboard_url else ()),
+        "",
+        text["disclaimer"],
+        text["subscribed"] + (f' {text["unsubscribe"]}: {unsubscribe_url}' if unsubscribe_url else ""),
+    )
+    return "\n".join(lines) + "\n"
+
+
 def build(
     readings: Sequence[Reading],
     sources: Iterable[str],
@@ -471,6 +554,7 @@ def build(
 </td></tr>
 <tr><td style="padding:14px 28px 22px;border-top:1px solid {GRID}">
   <div style="{SANS};font-size:12px;line-height:18px;color:{MUTED}">{text["note"]}</div>
+  <div style="{SANS};font-size:12px;line-height:18px;color:{MUTED};padding-top:8px">{text["disclaimer"]}</div>
   {notice_html(missing_sources(latest, sources), text)}
 </td></tr>
 {button_html(dashboard_url, text)}
@@ -479,7 +563,7 @@ def build(
 </td></tr></table>
 </div>"""
     subject = text["subject"].format(date=date, sell=fmt(cheapest.price, text), buy=fmt(best_paying.price, text))
-    return Email(subject, html, text["plain"])
+    return Email(subject, html, plain_text(latest, sources, text, date, dashboard_url, unsubscribe_url))
 
 
 def to_message(email: Email, sender: str, recipient: str, unsubscribe_url: str | None = None) -> EmailMessage:
@@ -506,8 +590,8 @@ def fetch_sheet(url: str | None) -> str:
     return response.content.decode("utf-8", errors="replace")
 
 
-def send_all(messages: Iterable[EmailMessage], user: str, password: str) -> tuple[int, int]:
-    """Send every message over one connection. Returns (delivered, refused)."""
+def send_batch(messages: Iterable[EmailMessage], user: str, password: str) -> tuple[int, int]:
+    """Send a few messages over one connection. Returns (delivered, refused)."""
     delivered = refused = 0
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
         smtp.login(user, password)
@@ -517,6 +601,25 @@ def send_all(messages: Iterable[EmailMessage], user: str, password: str) -> tupl
                 delivered += 1
             except smtplib.SMTPRecipientsRefused:  # one bad address must not stop the rest
                 refused += 1
+    return delivered, refused
+
+
+def send_all(
+    messages: Sequence[EmailMessage],
+    user: str,
+    password: str,
+    batch_size: int = BATCH_SIZE,
+    pause_seconds: float = BATCH_PAUSE_SECONDS,
+    send=send_batch,
+    pause=time.sleep,
+) -> tuple[int, int]:
+    """Send the messages in batches, pausing between them. Returns (delivered, refused)."""
+    delivered = refused = 0
+    for index, batch in enumerate(batches(messages, batch_size)):
+        if index:
+            pause(pause_seconds)
+        sent, rejected = send(batch, user, password)
+        delivered, refused = delivered + sent, refused + rejected
     return delivered, refused
 
 
@@ -535,11 +638,18 @@ def main() -> None:
     sheet = "" if only_to else fetch_sheet(env.get("SUBSCRIBERS_URL"))
     recipients = only_to or recipients_for(env.get("MAIL_TO"), sheet) or (user,)
     print("Test send: subscribers ignored." if only_to else describe_sheet(sheet))
+    # A test send to chosen addresses may reuse an old reading; a real send may not.
+    max_age = timedelta.max if only_to else MAX_READING_AGE
+    max_recipients = int(env.get("MAIL_MAX_RECIPIENTS") or MAX_RECIPIENTS)
+    problem = blocking_problem(readings[-1], len(recipients), datetime.now(timezone.utc), max_recipients, max_age)
     if "--check" in sys.argv:
         print(f"{len(recipients)} recipient(s) would receive the email; nothing was sent.")
+        print(f"A real send would be blocked: {problem}" if problem else "A real send would go ahead.")
         return
+    if problem:
+        sys.exit(problem)
     links = tuple(unsubscribe_link(env.get("UNSUBSCRIBE_URL"), recipient) for recipient in recipients)
-    messages = (
+    messages = tuple(
         to_message(build(readings, SOURCES, lang, dashboard_url, link), user, recipient, link)
         for recipient, link in zip(recipients, links)
     )

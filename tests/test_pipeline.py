@@ -1,6 +1,6 @@
 """Storage, scraping, backfill, email and dashboard building."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from dolar_market import dashboard, mailer
 from dolar_market.backfill import is_recent
@@ -141,6 +141,40 @@ def test_each_message_carries_a_personal_unsubscribe_link():
     assert message["To"] == "ana+x@example.com"
     assert message["List-Unsubscribe"] == f"<{link}>"
     assert mailer.unsubscribe_link(None, "ana@example.com") is None
+
+
+def test_plain_text_repeats_what_the_html_says():
+    link = "https://forms.example/f?e=ana"
+    email = mailer.build(READINGS, ["Alpha", "Beta", "Gamma"], "en", "https://example.com/board", link)
+    assert "Best deal today" in email.plain
+    assert "- Alpha: Buy 11.50 / Sell 12.30" in email.plain
+    assert "No data in this reading: Beta, Gamma" in email.plain
+    assert "https://example.com/board" in email.plain and link in email.plain
+    assert "not financial advice" in email.plain and "not financial advice" in email.html
+    assert "<" not in email.plain
+
+
+def test_stale_readings_and_oversized_lists_block_the_send():
+    latest = READINGS[-1]  # taken at 13:00 Bolivia time
+    soon = datetime(2026, 10, 5, 18, 0, tzinfo=timezone.utc)  # one hour later
+    assert mailer.blocking_problem(latest, 3, soon) is None
+    assert "stale" in mailer.blocking_problem(latest, 3, soon + timedelta(hours=6))
+    assert "exceed the limit of 200" in mailer.blocking_problem(latest, 201, soon)
+    assert mailer.blocking_problem(latest, 201, soon, max_recipients=500) is None
+
+
+def test_messages_are_sent_in_batches_with_a_pause_between_them():
+    sent, pauses = [], []
+
+    def fake_send(batch, user, password):
+        sent.append(len(batch))
+        return len(batch) - 1, 1
+
+    result = mailer.send_all(tuple(range(25)), "u", "p", batch_size=10, pause_seconds=30, send=fake_send, pause=pauses.append)
+    assert sent == [10, 10, 5]
+    assert pauses == [30, 30]  # between batches only, never after the last
+    assert result == (22, 3)
+    assert mailer.batches((), 10) == ()
 
 
 # --- dashboard ---
