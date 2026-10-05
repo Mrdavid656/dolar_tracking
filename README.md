@@ -1,7 +1,12 @@
 # dolar_market
 
-Reads the dollar exchange rate published by the BCB and 11 Bolivian banks twice a day
-(08:00 and 20:00, Bolivia time), stores it in `data/rates.csv` and emails a summary.
+Tracks the dollar exchange rate published by the BCB, 11 Bolivian banks and the parallel
+market. Three times a day it stores a reading in `data/rates.csv` and republishes a
+dashboard; once a day it emails a summary to every subscriber.
+
+- Dashboard: https://mrdavid656.github.io/dolar_tracking/
+- Readings: 07:00, 13:00 and 19:00 Bolivia time
+- Email: 09:00 Bolivia time
 
 ## Conventions
 
@@ -9,19 +14,23 @@ Reads the dollar exchange rate published by the BCB and 11 Bolivian banks twice 
 - Text shown to the reader (dashboard, email) is bilingual: Spanish and English.
   Every user-facing string lives in a translation table (`TEXTS` in
   `dashboard_template.html` and in `mailer.py`); add both languages when adding a string.
+- "Buy" is what a bank pays for a dollar and "sell" what it charges. The best deal is
+  therefore the **highest** buy and the **lowest** sell.
 
 ## Local usage
 
 ```
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 python -m dolar_market.scrape             # append one reading to the CSV
 python -m dolar_market.mailer --preview   # write email_preview.html without sending
-python -m dolar_market.dashboard          # generate dashboard.html from the CSV
+python -m dolar_market.dashboard          # generate dashboard.html and site/index.html
+python -m dolar_market.backfill           # add the sources missing from the latest reading
+python -m pytest                          # run the tests
 ```
 
 ## Dataset
 
-`data/rates.csv` holds one row per bank and reading, in bolivianos per dollar:
+`data/rates.csv` holds one row per source and reading, in bolivianos per dollar:
 
 | column | content |
 |---|---|
@@ -31,27 +40,55 @@ python -m dolar_market.dashboard          # generate dashboard.html from the CSV
 | `sell` | what the bank charges for one dollar |
 | `official` | official exchange rate shown on that site |
 
+Two sources are references rather than banks: `BCB` (the official rate) and `Parallel`
+(USDT/BOB on Binance P2P, as aggregated by CriptoYa). The dashboard and the email show
+them as reference lines; the parallel rate displayed is the midpoint of its buy and sell.
+
 ## Automation with GitHub Actions
 
-`.github/workflows/rates.yml` runs at 12:00 and 00:00 UTC, commits the CSV and sends the
-email only with the morning reading. To enable it:
+| workflow | when | what |
+|---|---|---|
+| `rates.yml` | 07:00, 13:00, 19:00 Bolivia time, and on pushes that change data or code | take a reading, commit it, report failing sources, publish the dashboard to GitHub Pages |
+| `email.yml` | 09:00 Bolivia time | email the latest reading to the subscribers |
+| `tests.yml` | pushes and pull requests | run the test suite |
 
-1. Push this repository to GitHub.
-2. Create a Gmail app password (requires 2-step verification):
-   https://myaccount.google.com/apppasswords
-3. Under *Settings → Secrets and variables → Actions* add the secrets:
-   - `GMAIL_USER`: your Gmail address
-   - `GMAIL_APP_PASSWORD`: the app password
-   - `MAIL_TO` (optional): comma-separated recipients; defaults to `GMAIL_USER`
-4. Optionally add the repository variable `MAIL_LANG` (`es` or `en`; defaults to `es`)
-   to choose the email language.
-5. Trigger the workflow manually from the *Actions* tab to test it.
+Settings, under *Settings → Secrets and variables → Actions*:
 
-## Dashboard
+| name | kind | purpose |
+|---|---|---|
+| `GMAIL_USER` | secret | Gmail address that sends the email |
+| `GMAIL_APP_PASSWORD` | secret | its app password (https://myaccount.google.com/apppasswords) |
+| `MAIL_TO` | secret, optional | comma-separated recipients |
+| `SUBSCRIBERS_URL` | secret, optional | URL of a text or CSV document listing subscriber addresses |
+| `MAIL_LANG` | variable, optional | email language, `es` (default) or `en` |
+| `SUBSCRIBE_URL` | variable, optional | sign-up form linked from the dashboard |
 
-`python -m dolar_market.dashboard` embeds every reading into `dashboard_template.html`
-and writes a self-contained `dashboard.html`. The page has an ES/EN toggle that
-remembers the viewer's choice.
+### Subscribers
+
+The email goes to every address in `MAIL_TO` plus every address found in the document at
+`SUBSCRIBERS_URL`. All recipients are placed in Bcc, so they never see each other.
+
+To let people subscribe on their own, create a Google Form that asks for an email address,
+link it to a Google Sheet and publish that sheet as CSV (*File → Share → Publish to web*).
+Store the published CSV link in `SUBSCRIBERS_URL` and the form link in `SUBSCRIBE_URL`.
+To unsubscribe someone, delete their row from the sheet.
+
+### Failing sources
+
+When a source is missing from the last three readings, `rates.yml` opens an issue labelled
+`source-down`, and closes it once the source answers again.
+
+## Backfill from a local computer
+
+Some sites refuse connections from GitHub's servers. `scripts/register_backfill_task.ps1`
+registers a Windows scheduled task that, shortly after each reading, queries from your
+computer only the sources that reading lacks and pushes them with the reading's timestamp.
+It does nothing when the reading is complete, and skips readings older than three hours.
+
+```
+.\scripts\register_backfill_task.ps1
+Unregister-ScheduledTask -TaskName DolarTrackingBackfill   # to remove it
+```
 
 ## Code structure
 
@@ -61,15 +98,22 @@ effects (network, disk, clock, email), which sit at the edges of each module.
 | module | content |
 |---|---|
 | `models.py` | immutable types: `Quote`, `Row`, `Reading` |
-| `sources.py` | `SOURCES`: each bank as a function built with `from_html` or `from_json` |
+| `sources.py` | `SOURCES`: each source as a URL plus a pure parser (`from_html`, `from_json`) |
 | `storage.py` | read and write the CSV; group rows into readings |
+| `analysis.py` | questions about readings: references, best deals, failing sources |
 | `scrape.py` | query the sources, validate and save |
+| `backfill.py` | query only the sources the latest reading lacks |
+| `monitor.py` | list the sources that keep failing |
 | `mailer.py` | build the summary HTML and send it |
 | `dashboard.py` | embed the readings into `dashboard_template.html` |
 
 ## Adding or fixing a source
 
-Each bank is one entry of `SOURCES` in `dolar_market/sources.py`: a URL plus the patterns
-to search for (`from_html`) or a function that reads the JSON (`from_json`).
-If a site changes, only that source fails: the scraper reports it as `FAIL`
-and the email lists it as having no data.
+Each source is one entry of `SOURCES` in `dolar_market/sources.py`: a URL plus the patterns
+to search for (`from_html`) or a function that reads the JSON (`from_json`). After changing
+one, refresh its saved response and expected values, then run the tests:
+
+```
+python -m tests.capture_fixtures "Banco Unión"
+python -m pytest
+```

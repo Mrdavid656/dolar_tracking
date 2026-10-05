@@ -4,9 +4,16 @@ Usage:
     python -m dolar_market.mailer            # send the email
     python -m dolar_market.mailer --preview  # only write email_preview.html
 
-Environment variables: GMAIL_USER, GMAIL_APP_PASSWORD, MAIL_TO (optional,
-defaults to GMAIL_USER; accepts several comma-separated recipients) and
-MAIL_LANG (optional, "es" or "en"; defaults to "es").
+Environment variables:
+    GMAIL_USER, GMAIL_APP_PASSWORD  sender account and its app password
+    MAIL_TO          optional; comma-separated recipients
+    SUBSCRIBERS_URL  optional; URL of a text/CSV document listing subscriber
+                     addresses (for example a published Google Sheet)
+    MAIL_LANG        optional; "es" or "en" (defaults to "es")
+    DASHBOARD_URL    optional; adds a button linking to the live dashboard
+
+Every recipient is placed in Bcc, so subscribers never see each other. With no
+recipients configured the email goes to GMAIL_USER.
 
 The HTML mirrors the dashboard's dark board. Email clients run no scripts and
 ignore most CSS, so the layout is built from tables with inline styles and the
@@ -15,6 +22,7 @@ chart from table cells sized in percentages.
 
 import math
 import os
+import re
 import smtplib
 import sys
 from collections.abc import Iterable, Mapping, Sequence
@@ -23,12 +31,25 @@ from email.message import EmailMessage
 from pathlib import Path
 from typing import NamedTuple
 
+import requests
+
+from .analysis import (
+    Deal,
+    average_gap,
+    best_buy,
+    best_sell,
+    missing_sources,
+    official_of,
+    parallel_of,
+    priced_banks,
+)
 from .models import Quote, Reading
-from .sources import SOURCES
+from .sources import PARALLEL_SOURCE, SOURCES
 from .storage import read_readings
 
 NO_DATA = Quote()
 DEFAULT_LANG = "es"
+EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 
 # The dashboard's dark palette.
 PAGE = "#0d0f0e"
@@ -39,6 +60,7 @@ MUTED = "#898f89"
 GRID = "#2a2d2b"
 AXIS = "#3a3e3b"
 ACCENT = "#6fcfb4"
+PARALLEL_COLOR = "#a79df0"
 BUY_COLOR = "#3987e5"
 SELL_COLOR = "#d95926"
 ALERT = "#e66767"
@@ -55,8 +77,12 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         "title": "Pizarra del Dólar",
         "reading": "Lectura del {date} (hora de Bolivia), en bolivianos por dólar",
         "official": "Oficial BCB",
-        "cheapest_sell": "Dónde comprar dólares más barato",
-        "best_buy": "Dónde pagan más por tus dólares",
+        "parallel": "Paralelo",
+        "best_deal": "Mejor oferta de hoy",
+        "to_buy": "Para comprar dólares",
+        "to_buy_detail": "vende a Bs {price}, la venta más baja",
+        "to_sell": "Para vender tus dólares",
+        "to_sell_detail": "compra a Bs {price}, la compra más alta",
         "average_gap": "Diferencia media entre venta y compra",
         "across_banks": "en {count} bancos",
         "by_bank": "Compra y venta por banco",
@@ -65,8 +91,13 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         "bank": "Banco",
         "buy": "Compra",
         "sell": "Venta",
-        "note": "Las flechas comparan con la lectura anterior. La línea vertical marca el oficial del BCB.",
+        "note": (
+            "Las flechas comparan con la lectura anterior. Las líneas verticales marcan el oficial del BCB "
+            "y el dólar paralelo (USDT en Binance P2P, punto medio entre compra y venta)."
+        ),
         "missing": "Sin datos en esta lectura: {banks}",
+        "open_dashboard": "Ver el tablero completo",
+        "subscribed": "Recibes este correo porque te suscribiste. Para dejar de recibirlo, responde a este mensaje.",
         "subject": "Dólar Bolivia {date}: venta desde Bs {sell}, compra hasta Bs {buy}",
         "plain": "Tu cliente de correo no muestra HTML.",
     },
@@ -75,8 +106,12 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         "title": "Dollar Board",
         "reading": "Reading from {date} (Bolivia time), in bolivianos per dollar",
         "official": "BCB official",
-        "cheapest_sell": "Cheapest place to buy dollars",
-        "best_buy": "Best price for selling your dollars",
+        "parallel": "Parallel",
+        "best_deal": "Best deal today",
+        "to_buy": "To buy dollars",
+        "to_buy_detail": "sells at Bs {price}, the lowest sell",
+        "to_sell": "To sell your dollars",
+        "to_sell_detail": "buys at Bs {price}, the highest buy",
         "average_gap": "Average gap between sell and buy",
         "across_banks": "across {count} banks",
         "by_bank": "Buy and sell by bank",
@@ -85,8 +120,13 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         "bank": "Bank",
         "buy": "Buy",
         "sell": "Sell",
-        "note": "Arrows compare with the previous reading. The vertical line marks the BCB official rate.",
+        "note": (
+            "Arrows compare with the previous reading. The vertical lines mark the BCB official rate "
+            "and the parallel dollar (USDT on Binance P2P, midpoint between buy and sell)."
+        ),
         "missing": "No data in this reading: {banks}",
+        "open_dashboard": "Open the full dashboard",
+        "subscribed": "You receive this email because you subscribed. To stop receiving it, reply to this message.",
         "subject": "Bolivia dollar {date}: sell from Bs {sell}, buy up to Bs {buy}",
         "plain": "Your email client does not display HTML.",
     },
@@ -113,35 +153,11 @@ class Scale(NamedTuple):
         return tuple(self.low + i * step for i in range(count + 1))
 
 
-# --- Pure functions: numbers about a reading ---------------------------------------
+# --- Pure functions: values and recipients ------------------------------------------
 
 
 def fmt(value: float | None, text: Mapping[str, str], digits: int = 2) -> str:
     return "—" if value is None else f"{value:.{digits}f}".replace(".", text["decimal"])
-
-
-def official_of(reading: Reading) -> float | None:
-    return next((q.official for q in reading.banks.values() if q.official is not None), None)
-
-
-def priced_banks(reading: Reading) -> tuple[tuple[str, Quote], ...]:
-    """Banks that publish buy or sell, ordered like the dashboard: cheapest seller first."""
-    banks = ((b, q) for b, q in reading.banks.items() if q.buy is not None or q.sell is not None)
-    return tuple(sorted(banks, key=lambda p: (p[1].sell is None, p[1].sell or 0, -(p[1].buy or 0), p[0])))
-
-
-def missing_banks(reading: Reading, sources: Iterable[str]) -> tuple[str, ...]:
-    return tuple(bank for bank in sources if bank not in reading.banks)
-
-
-def banks_with(banks: Sequence[tuple[str, Quote]], field: str, value: float | None) -> str:
-    return ", ".join(bank for bank, q in banks if value is not None and getattr(q, field) == value)
-
-
-def average_gap(banks: Sequence[tuple[str, Quote]]) -> tuple[float | None, int]:
-    """Mean of sell minus buy, and how many banks publish both values."""
-    gaps = tuple(q.sell - q.buy for _, q in banks if q.buy is not None and q.sell is not None)
-    return (sum(gaps) / len(gaps) if gaps else None), len(gaps)
 
 
 def scale_for(values: Iterable[float | None]) -> Scale:
@@ -149,12 +165,22 @@ def scale_for(values: Iterable[float | None]) -> Scale:
     return Scale(math.floor((min(present) - 0.1) * 2) / 2, math.ceil((max(present) + 0.1) * 2) / 2)
 
 
+def display_name(source: str, text: Mapping[str, str]) -> str:
+    return text["parallel"] if source == PARALLEL_SOURCE else source
+
+
+def parse_recipients(*documents: str | None) -> tuple[str, ...]:
+    """Every distinct email address found in the given texts, in order of appearance."""
+    found = (match.lower() for document in documents if document for match in EMAIL_PATTERN.findall(document))
+    return tuple(dict.fromkeys(found))
+
+
 # --- Pure functions: HTML fragments -------------------------------------------------
 
 
-def blank(height: int, color: str) -> str:
+def blank(height: int, color: str, extra: str = "") -> str:
     """A solid block; the non-breaking space keeps clients from collapsing it."""
-    return f'<div style="height:{height}px;background:{color};font-size:0;line-height:0">&nbsp;</div>'
+    return f'<div style="{extra}height:{height}px;background:{color};font-size:0;line-height:0">&nbsp;</div>'
 
 
 def half_dot(color: str, side: str) -> str:
@@ -175,16 +201,21 @@ def edge_cell(color: str, side: str, width: str = "") -> str:
     )
 
 
-def official_line(scale: Scale, official: float | None) -> str:
-    """Background that draws the official rate as a vertical line across a track."""
-    if official is None:
-        return ""
-    at = scale.percent(official)
-    stops = f"transparent {at - 0.4:.2f}%,{ACCENT} {at - 0.4:.2f}%,{ACCENT} {at + 0.4:.2f}%,transparent {at + 0.4:.2f}%"
-    return f"background-image:linear-gradient(90deg,{stops});"
+def reference_lines(scale: Scale, references: Sequence[tuple[float | None, str]]) -> str:
+    """Background that draws each reference rate as a vertical line across a track."""
+
+    def line(value: float, color: str) -> str:
+        at = scale.percent(value)
+        return (
+            f"linear-gradient(90deg,transparent {at - 0.4:.2f}%,{color} {at - 0.4:.2f}%,"
+            f"{color} {at + 0.4:.2f}%,transparent {at + 0.4:.2f}%)"
+        )
+
+    lines = ",".join(line(value, color) for value, color in references if value is not None)
+    return f"background-image:{lines};" if lines else ""
 
 
-def track_html(quote: Quote, scale: Scale, official: float | None) -> str:
+def track_html(quote: Quote, scale: Scale, lines: str) -> str:
     """One chart row: a buy dot and a sell dot joined by a bar, each centred on its value."""
     has_both = quote.buy is not None and quote.sell is not None
     first_color = BUY_COLOR if quote.buy is not None else SELL_COLOR
@@ -200,7 +231,7 @@ def track_html(quote: Quote, scale: Scale, official: float | None) -> str:
             f"</tr></table></td>"
         )
     return (
-        f'<table {TABLE} width="100%" style="width:100%;table-layout:fixed;{official_line(scale, official)}"><tr>'
+        f'<table {TABLE} width="100%" style="width:100%;table-layout:fixed;{lines}"><tr>'
         f'{edge_cell(first_color, "left", f"width:{left:.2f}%;")}{bar}'
         f'{edge_cell(SELL_COLOR if has_both else first_color, "right")}</tr></table>'
     )
@@ -220,13 +251,13 @@ def number_cell(value, previous, align: str, text: Mapping[str, str]) -> str:
     )
 
 
-def row_html(bank: str, quote: Quote, previous: Quote, scale: Scale, official, text) -> str:
+def row_html(bank: str, quote: Quote, previous: Quote, scale: Scale, lines: str, text) -> str:
     return (
         f'<tr><td style="padding:10px 0;border-top:1px solid {GRID};{SANS};font-size:14px;font-weight:600;'
         f'color:{INK}">{bank}</td>'
         f'{number_cell(quote.buy, previous.buy, "right", text)}'
         f'<td width="46%" style="width:46%;padding:10px 5px;border-top:1px solid {GRID}">'
-        f"{track_html(quote, scale, official)}</td>"
+        f"{track_html(quote, scale, lines)}</td>"
         f'{number_cell(quote.sell, previous.sell, "left", text)}</tr>'
     )
 
@@ -251,50 +282,91 @@ def header_row_html(scale: Scale, text: Mapping[str, str]) -> str:
     )
 
 
-def fact_html(label: str, value: float | None, detail: str, text: Mapping[str, str]) -> str:
+def metric_html(label: str, value: float | None, color: str, text: Mapping[str, str]) -> str:
+    return (
+        f'<td align="right" valign="bottom" style="padding-left:20px;white-space:nowrap">'
+        f'<div style="{LABEL}">{label}</div>'
+        f'<div style="{MONO};font-size:28px;line-height:34px;color:{color}">{fmt(value, text)}</div></td>'
+    )
+
+
+def column_html(label: str, headline: str, detail: str, headline_style: str) -> str:
     return (
         f'<td valign="top" style="width:33.33%;padding:0 12px 0 0">'
         f'<div style="{SANS};font-size:13px;line-height:18px;color:{INK_2}">{label}</div>'
-        f'<div style="{MONO};font-size:24px;line-height:34px;color:{INK}">{fmt(value, text)}</div>'
+        f'<div style="{headline_style};color:{INK};padding:4px 0">{headline}</div>'
         f'<div style="{SANS};font-size:13px;line-height:18px;color:{INK_2}">{detail}</div></td>'
     )
 
 
+def deal_html(label: str, deal: Deal, detail: str, text: Mapping[str, str]) -> str:
+    """A best-deal column: the winning bank is the headline, its price the detail."""
+    headline = ", ".join(deal.banks) or "—"
+    style = f"{SANS};font-size:20px;line-height:26px;font-weight:700"
+    return column_html(label, headline, detail.format(price=fmt(deal.price, text)), style)
+
+
 def legend_html(text: Mapping[str, str]) -> str:
-    def key(color: str, label: str) -> str:
+    def dot_key(color: str, label: str) -> str:
         return f'<span style="color:{color};font-size:14px">●</span>&nbsp;{label}'
 
-    return (
-        f'<div style="{SANS};font-size:12px;line-height:20px;color:{INK_2}">'
-        f'{key(BUY_COLOR, text["legend_buy"])} &nbsp;&nbsp; {key(SELL_COLOR, text["legend_sell"])} &nbsp;&nbsp; '
-        f'<span style="color:{ACCENT}">|</span>&nbsp;{text["official"]}</div>'
+    def line_key(color: str, label: str) -> str:
+        return f'<span style="color:{color};font-weight:700">|</span>&nbsp;{label}'
+
+    keys = (
+        dot_key(BUY_COLOR, text["legend_buy"]),
+        dot_key(SELL_COLOR, text["legend_sell"]),
+        line_key(ACCENT, text["official"]),
+        line_key(PARALLEL_COLOR, text["parallel"]),
     )
+    return f'<div style="{SANS};font-size:12px;line-height:20px;color:{INK_2}">{" &nbsp;&nbsp; ".join(keys)}</div>'
 
 
 def notice_html(missing: Sequence[str], text: Mapping[str, str]) -> str:
     if not missing:
         return ""
-    message = text["missing"].format(banks=", ".join(missing))
-    return f'<div style="{SANS};font-size:13px;color:{ALERT};padding-top:10px">{message}</div>'
+    names = ", ".join(display_name(source, text) for source in missing)
+    return f'<div style="{SANS};font-size:13px;color:{ALERT};padding-top:10px">{text["missing"].format(banks=names)}</div>'
 
 
-def build(readings: Sequence[Reading], sources: Iterable[str], lang: str = DEFAULT_LANG) -> Email:
+def button_html(url: str | None, text: Mapping[str, str]) -> str:
+    if not url:
+        return ""
+    return (
+        f'<tr><td align="center" style="padding:6px 28px 24px">'
+        f'<a href="{url}" style="display:inline-block;padding:11px 22px;border-radius:6px;background:{INK};'
+        f'{SANS};font-size:14px;font-weight:700;color:{PAGE};text-decoration:none">{text["open_dashboard"]}</a>'
+        f"</td></tr>"
+    )
+
+
+def build(
+    readings: Sequence[Reading],
+    sources: Iterable[str],
+    lang: str = DEFAULT_LANG,
+    dashboard_url: str | None = None,
+) -> Email:
     """Build the email for the latest reading, compared with the previous one."""
     text = TEXTS.get(lang, TEXTS[DEFAULT_LANG])
     latest = readings[-1]
     previous = readings[-2].banks if len(readings) > 1 else {}
     date = datetime.fromisoformat(latest.timestamp).strftime("%d/%m/%Y %H:%M")
-    official = official_of(latest)
+    official, parallel = official_of(latest), parallel_of(latest)
     banks = priced_banks(latest)
-    min_sell = min((q.sell for _, q in banks if q.sell is not None), default=None)
-    max_buy = max((q.buy for _, q in banks if q.buy is not None), default=None)
+    cheapest, best_paying = best_sell(banks), best_buy(banks)
     gap, gap_count = average_gap(banks)
-    scale = scale_for([official, *(v for _, q in banks for v in (q.buy, q.sell))])
-    rows = "".join(row_html(b, q, previous.get(b, NO_DATA), scale, official, text) for b, q in banks)
-    facts = (
-        fact_html(text["cheapest_sell"], min_sell, banks_with(banks, "sell", min_sell), text)
-        + fact_html(text["best_buy"], max_buy, banks_with(banks, "buy", max_buy), text)
-        + fact_html(text["average_gap"], gap, text["across_banks"].format(count=gap_count), text)
+    scale = scale_for([official, parallel, *(v for _, q in banks for v in (q.buy, q.sell))])
+    lines = reference_lines(scale, ((official, ACCENT), (parallel, PARALLEL_COLOR)))
+    rows = "".join(row_html(b, q, previous.get(b, NO_DATA), scale, lines, text) for b, q in banks)
+    deals = (
+        deal_html(text["to_buy"], cheapest, text["to_buy_detail"], text)
+        + deal_html(text["to_sell"], best_paying, text["to_sell_detail"], text)
+        + column_html(
+            text["average_gap"],
+            fmt(gap, text),
+            text["across_banks"].format(count=gap_count),
+            f"{MONO};font-size:22px;line-height:26px",
+        )
     )
     html = f"""<div style="margin:0;padding:0;background:{PAGE}">
 <table {TABLE} width="100%" bgcolor="{PAGE}" style="width:100%;background:{PAGE}"><tr><td align="center" style="padding:28px 12px">
@@ -302,18 +374,17 @@ def build(readings: Sequence[Reading], sources: Iterable[str], lang: str = DEFAU
 <tr><td style="padding:28px 28px 0">
   <table {TABLE} width="100%" style="width:100%"><tr>
     <td valign="bottom">
-      <div style="{SANS};font-size:34px;line-height:38px;font-weight:800;letter-spacing:-0.5px;color:{INK}">{text["title"]}</div>
+      <div style="{SANS};font-size:32px;line-height:36px;font-weight:800;letter-spacing:-0.5px;color:{INK}">{text["title"]}</div>
       <div style="{SANS};font-size:13px;line-height:19px;color:{INK_2};padding-top:6px">{text["reading"].format(date=date)}</div>
     </td>
-    <td valign="bottom" align="right" style="padding-left:16px;white-space:nowrap">
-      <div style="{LABEL}">{text["official"]}</div>
-      <div style="{MONO};font-size:32px;line-height:36px;color:{ACCENT}">{fmt(official, text)}</div>
-    </td>
+    {metric_html(text["official"], official, ACCENT, text)}
+    {metric_html(text["parallel"], parallel, PARALLEL_COLOR, text)}
   </tr></table>
-  {blank(2, INK).replace('<div style="', '<div style="margin-top:16px;')}
+  {blank(2, INK, "margin-top:16px;")}
 </td></tr>
 <tr><td style="padding:24px 28px 0">
-  <table {TABLE} width="100%" style="width:100%;table-layout:fixed"><tr>{facts}</tr></table>
+  <div style="{SANS};font-size:19px;line-height:24px;font-weight:700;color:{INK};padding-bottom:12px">{text["best_deal"]}</div>
+  <table {TABLE} width="100%" style="width:100%;table-layout:fixed"><tr>{deals}</tr></table>
 </td></tr>
 <tr><td style="padding:28px 28px 0">
   <div style="{SANS};font-size:19px;line-height:24px;font-weight:700;color:{INK}">{text["by_bank"]}</div>
@@ -325,28 +396,42 @@ def build(readings: Sequence[Reading], sources: Iterable[str], lang: str = DEFAU
 {rows}
   </table>
 </td></tr>
-<tr><td style="padding:14px 28px 26px;border-top:1px solid {GRID}">
+<tr><td style="padding:14px 28px 22px;border-top:1px solid {GRID}">
   <div style="{SANS};font-size:12px;line-height:18px;color:{MUTED}">{text["note"]}</div>
-  {notice_html(missing_banks(latest, sources), text)}
+  {notice_html(missing_sources(latest, sources), text)}
 </td></tr>
+{button_html(dashboard_url, text)}
 </table>
+<div style="{SANS};font-size:11px;line-height:17px;color:{MUTED};max-width:600px;padding-top:14px">{text["subscribed"]}</div>
 </td></tr></table>
 </div>"""
-    subject = text["subject"].format(date=date, sell=fmt(min_sell, text), buy=fmt(max_buy, text))
+    subject = text["subject"].format(date=date, sell=fmt(cheapest.price, text), buy=fmt(best_paying.price, text))
     return Email(subject, html, text["plain"])
 
 
-def to_message(email: Email, sender: str, recipient: str) -> EmailMessage:
+def to_message(email: Email, sender: str, recipients: Sequence[str]) -> EmailMessage:
+    """Address the email to the sender and put every recipient in Bcc."""
     message = EmailMessage()
     message["Subject"] = email.subject
     message["From"] = sender
-    message["To"] = recipient
+    message["To"] = sender
+    if recipients:
+        message["Bcc"] = ", ".join(recipients)
     message.set_content(email.plain)
     message.add_alternative(email.html, subtype="html")
     return message
 
 
 # --- Effects: disk, environment and network --------------------------------------
+
+
+def fetch_subscribers(url: str | None) -> str:
+    """Download the subscriber list, or return nothing when no URL is configured."""
+    if not url:
+        return ""
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    return response.text
 
 
 def send(message: EmailMessage, user: str, password: str) -> None:
@@ -356,15 +441,16 @@ def send(message: EmailMessage, user: str, password: str) -> None:
 
 
 def main() -> None:
-    email = build(read_readings(), SOURCES, os.environ.get("MAIL_LANG") or DEFAULT_LANG)
+    env = os.environ
+    email = build(read_readings(), SOURCES, env.get("MAIL_LANG") or DEFAULT_LANG, env.get("DASHBOARD_URL"))
     if "--preview" in sys.argv:
         Path("email_preview.html").write_text(email.html, encoding="utf-8")
         print(email.subject)
         return
-    user = os.environ["GMAIL_USER"]
-    recipient = os.environ.get("MAIL_TO") or user
-    send(to_message(email, user, recipient), user, os.environ["GMAIL_APP_PASSWORD"])
-    print(f"Email sent to {recipient}")
+    user = env["GMAIL_USER"]
+    recipients = parse_recipients(env.get("MAIL_TO"), fetch_subscribers(env.get("SUBSCRIBERS_URL")))
+    send(to_message(email, user, recipients), user, env["GMAIL_APP_PASSWORD"])
+    print(f"Email sent to {len(recipients) or 1} recipient(s)")
 
 
 if __name__ == "__main__":

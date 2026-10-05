@@ -1,19 +1,35 @@
 name: Rates
 
+# Takes a reading three times a day, then rebuilds and publishes the dashboard.
+# A push that changes the data or the code (for example a backfill from a local
+# machine) skips the reading and only republishes the dashboard.
+
 on:
   schedule:
-    - cron: "0 12 * * *" # 08:00 Bolivia time (UTC-4)
-    - cron: "0 0 * * *" # 20:00 Bolivia time
+    - cron: "0 11 * * *" # 07:00 Bolivia time (UTC-4)
+    - cron: "0 17 * * *" # 13:00 Bolivia time
+    - cron: "0 23 * * *" # 19:00 Bolivia time
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - data/rates.csv
+      - dolar_market/**
 
 permissions:
   contents: write
+  issues: write
+  pages: write
+  id-token: write
 
 concurrency: rates
 
 jobs:
-  scrape:
+  update:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -23,22 +39,51 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Query banks
+        if: github.event_name != 'push'
         run: python -m dolar_market.scrape
 
       - name: Save dataset
+        if: github.event_name != 'push'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/rates.csv
-          git diff --cached --quiet || git commit -m "Rates $(TZ=America/La_Paz date '+%Y-%m-%d %H:%M')"
+          git diff --cached --quiet && exit 0
+          git commit -m "Rates $(TZ=America/La_Paz date '+%Y-%m-%d %H:%M')"
+          git pull --rebase
           git push
 
-      # The email goes out only with the morning reading (and on manual runs).
-      - name: Send email
-        if: github.event.schedule != '0 0 * * *'
+      # Opens an issue for every source missing from the last three readings and
+      # closes the issues of sources that answer again.
+      - name: Report failing sources
+        if: github.event_name != 'push'
         env:
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-          MAIL_TO: ${{ secrets.MAIL_TO }}
-          MAIL_LANG: ${{ vars.MAIL_LANG }}
-        run: python -m dolar_market.mailer
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m dolar_market.monitor > failing.txt
+          gh label create source-down --color B60205 --description "A source stopped answering" --force
+          while IFS= read -r name; do
+            [ -z "$name" ] && continue
+            title="Source failing: $name"
+            existing=$(gh issue list --label source-down --state open --json title --jq ".[] | select(.title == \"$title\") | .title")
+            [ -n "$existing" ] && continue
+            gh issue create --title "$title" --label source-down \
+              --body "\`$name\` is missing from the last three readings. Its site may have changed or may be blocking GitHub's servers. See the Rates workflow logs, fix its entry in \`dolar_market/sources.py\` and refresh its fixture with \`python -m tests.capture_fixtures \"$name\"\`."
+          done < failing.txt
+          gh issue list --label source-down --state open --json number,title --jq '.[] | "\(.number)\t\(.title)"' |
+            while IFS=$'\t' read -r number title; do
+              grep -Fxq "${title#Source failing: }" failing.txt ||
+                gh issue close "$number" --comment "The source is answering again."
+            done
+
+      - name: Build dashboard
+        env:
+          SUBSCRIBE_URL: ${{ vars.SUBSCRIBE_URL }}
+        run: python -m dolar_market.dashboard
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

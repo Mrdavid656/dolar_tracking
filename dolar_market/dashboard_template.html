@@ -12,6 +12,7 @@
   --grid: #e1e3dc;
   --axis: #c2c6bd;
   --accent: #0f5c4a;
+  --parallel: #4a3aa7;
   --buy: #2a78d6;
   --sell: #eb6834;
   --up: #0a8a0a;
@@ -23,14 +24,14 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0d0f0e; --surface: #181a19; --ink: #f4f6f3; --ink-2: #c0c5bf; --muted: #898f89;
-    --grid: #2a2d2b; --axis: #3a3e3b; --accent: #6fcfb4; --buy: #3987e5; --sell: #d95926;
+    --grid: #2a2d2b; --axis: #3a3e3b; --accent: #6fcfb4; --parallel: #a79df0; --buy: #3987e5; --sell: #d95926;
     --up: #0ca30c; --down: #e66767;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0d0f0e; --surface: #181a19; --ink: #f4f6f3; --ink-2: #c0c5bf; --muted: #898f89;
-  --grid: #2a2d2b; --axis: #3a3e3b; --accent: #6fcfb4; --buy: #3987e5; --sell: #d95926;
+  --grid: #2a2d2b; --axis: #3a3e3b; --accent: #6fcfb4; --parallel: #a79df0; --buy: #3987e5; --sell: #d95926;
   --up: #0ca30c; --down: #e66767;
   color-scheme: dark;
 }
@@ -43,9 +44,11 @@ header { display: flex; flex-wrap: wrap; justify-content: space-between; align-i
 h1 { font-family: var(--display); font-stretch: 80%; font-weight: 800; font-size: clamp(34px, 7vw, 54px); line-height: 1; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
 .subtitle { color: var(--ink-2); margin: 8px 0 0; }
 .header-side { display: flex; flex-direction: column; align-items: flex-end; gap: 12px; }
-.official { text-align: right; }
+.metrics { display: flex; gap: 28px; }
+.metric { text-align: right; }
 .label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
-.official .num { display: block; font-size: 34px; font-weight: 500; line-height: 1.1; color: var(--accent); }
+.metric .num { display: block; font-size: 34px; font-weight: 500; line-height: 1.1; color: var(--accent); }
+.metric.parallel .num { color: var(--parallel); }
 
 .lang { display: inline-flex; border: 1px solid var(--axis); border-radius: 4px; overflow: hidden; }
 .lang button { font: inherit; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; padding: 4px 10px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer; }
@@ -58,6 +61,7 @@ h1 { font-family: var(--display); font-stretch: 80%; font-weight: 800; font-size
 .facts dt { color: var(--ink-2); font-size: 14px; }
 .facts dd { margin: 4px 0 0; }
 .facts .num { font-size: 26px; font-weight: 500; }
+.facts .winner { display: block; font-family: var(--display); font-stretch: 90%; font-weight: 700; font-size: 26px; line-height: 1.2; overflow-wrap: anywhere; }
 .facts .who { display: block; color: var(--ink-2); font-size: 14px; }
 
 h2 { font-family: var(--display); font-stretch: 85%; font-weight: 700; font-size: 22px; margin: 0; text-wrap: balance; }
@@ -68,6 +72,7 @@ section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .key { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .key.buy { background: var(--buy); } .key.sell { background: var(--sell); }
 .key.official-line { width: 2px; height: 14px; border-radius: 0; background: var(--accent); }
+.key.parallel-line { width: 0; height: 14px; border-radius: 0; border-left: 2px dashed var(--parallel); }
 
 .panel { background: var(--surface); border: 1px solid var(--grid); border-radius: 6px; padding: 8px 16px 14px; position: relative; }
 .row { display: grid; grid-template-columns: minmax(84px, 11rem) 3.4rem minmax(70px, 1fr) 3.4rem; align-items: center; column-gap: 12px; padding: 9px 0; border-top: 1px solid var(--grid); }
@@ -81,6 +86,7 @@ section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .track i { position: absolute; top: 50%; display: block; }
 .tick { top: 0 !important; bottom: 0; width: 1px; background: var(--grid); }
 .official-mark { top: -9px !important; bottom: -9px; width: 2px; margin-left: -1px; background: var(--accent); opacity: 0.55; }
+.parallel-mark { top: -9px !important; bottom: -9px; width: 0; margin-left: -1px; border-left: 2px dashed var(--parallel); opacity: 0.8; }
 .bar { height: 4px; margin-top: -2px; background: var(--axis); border-radius: 2px; }
 .dot { width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; box-shadow: 0 0 0 2px var(--surface); }
 .dot.buy { background: var(--buy); } .dot.sell { background: var(--sell); }
@@ -100,6 +106,7 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #history text.end-label { font-family: var(--body); font-size: 12px; fill: var(--ink-2); }
 .note { color: var(--ink-2); font-size: 13px; margin: 8px 0 0; max-width: 70ch; }
 .empty { color: var(--ink-2); margin: 0; padding: 28px 0 20px; max-width: 60ch; }
+footer a { color: var(--accent); }
 footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid); padding-top: 14px; max-width: 70ch; }
 </style>
 
@@ -114,14 +121,23 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid)
         <button type="button" id="lang-es" data-lang="es">ES</button>
         <button type="button" id="lang-en" data-lang="en">EN</button>
       </div>
-      <div class="official">
-        <span class="label" data-i18n="officialLabel"></span>
-        <span class="num" id="official"></span>
+      <div class="metrics">
+        <div class="metric">
+          <span class="label" data-i18n="officialLabel"></span>
+          <span class="num" id="official"></span>
+        </div>
+        <div class="metric parallel">
+          <span class="label" data-i18n="parallelLabel"></span>
+          <span class="num" id="parallel"></span>
+        </div>
       </div>
     </div>
   </header>
 
-  <dl class="facts" id="facts"></dl>
+  <section>
+    <h2 data-i18n="bestDeal"></h2>
+    <dl class="facts" id="facts"></dl>
+  </section>
 
   <section>
     <div class="section-head">
@@ -130,6 +146,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid)
         <span><i class="key buy"></i><span data-i18n="legendBuy"></span></span>
         <span><i class="key sell"></i><span data-i18n="legendSell"></span></span>
         <span><i class="key official-line"></i><span data-i18n="officialLabel"></span></span>
+        <span><i class="key parallel-line"></i><span data-i18n="parallelLabel"></span></span>
       </div>
     </div>
     <div class="panel" id="board"></div>
@@ -152,7 +169,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid)
     <div class="panel" id="history"></div>
   </section>
 
-  <footer id="footer"></footer>
+  <footer><span id="footer-text"></span> <a id="subscribe-link" target="_blank" rel="noopener" hidden></a></footer>
 </div>
 
 <script>
@@ -165,9 +182,13 @@ const TEXTS = {
     title: "Pizarra del Dólar",
     subtitle: date => `Lectura del ${date} (hora de Bolivia), en bolivianos por dólar`,
     officialLabel: "Oficial BCB",
+    parallelLabel: "Paralelo",
     languageLabel: "Idioma",
-    cheapestSell: "Dónde comprar dólares más barato",
-    bestBuy: "Dónde pagan más por tus dólares",
+    bestDeal: "Mejor oferta de hoy",
+    toBuy: "Para comprar dólares",
+    toBuyDetail: price => `vende a Bs ${price}, la venta más baja`,
+    toSell: "Para vender tus dólares",
+    toSellDetail: price => `compra a Bs ${price}, la compra más alta`,
     averageGap: "Diferencia media entre venta y compra",
     acrossBanks: n => `en ${n} bancos`,
     byBank: "Compra y venta por banco",
@@ -181,16 +202,17 @@ const TEXTS = {
     viewDay: "Velas de venta por día",
     viewWeek: "Velas de venta por semana",
     bestOverall: "Mejor precio entre todos los bancos",
-    oneReading: "Hay una sola lectura guardada. Las líneas y las velas aparecen desde la segunda; las lecturas se toman cada día a las 08:00 y a las 20:00.",
+    oneReading: "Hay una sola lectura guardada. Las líneas y las velas aparecen desde la segunda; las lecturas se toman cada día a las 07:00, 13:00 y 19:00.",
     noBankData: "Este banco no tiene datos en las lecturas guardadas.",
     noSellData: "Este banco no publica precio de venta en las lecturas guardadas.",
-    candleNote: weekly => `Cada vela resume la venta de ${weekly ? "una semana" : "un día"}: el cuerpo va de la primera a la última lectura (verde si subió, rojo si bajó, gris si no cambió) y la mecha marca el máximo y el mínimo. La línea punteada es el oficial del BCB.`,
+    candleNote: weekly => `Cada vela resume la venta de ${weekly ? "una semana" : "un día"}: el cuerpo va de la primera a la última lectura (verde si subió, rojo si bajó, gris si no cambió) y la mecha marca el máximo y el mínimo. La línea continua es el oficial del BCB.`,
     open: "Apertura", high: "Máximo", low: "Mínimo", close: "Cierre",
     readingCount: n => `${n} ${n === 1 ? "lectura" : "lecturas"}`,
     weekOf: date => `Semana del ${date}`,
     linesAria: "Compra y venta del dólar a lo largo del tiempo",
     candlesAria: weekly => `Velas del precio de venta del dólar por ${weekly ? "semana" : "día"}`,
-    footer: n => `${n} ${n === 1 ? "lectura guardada" : "lecturas guardadas"}, tomadas de los sitios públicos de cada banco. Ganadero solo publica un valor referencial de venta.`,
+    footer: n => `${n} ${n === 1 ? "lectura guardada" : "lecturas guardadas"}, tomadas de los sitios públicos de cada banco. Ganadero solo publica un valor referencial de venta. El paralelo es el USDT en Binance P2P: punto medio entre compra y venta.`,
+    subscribe: "Recibir el resumen diario por correo",
     missing: banks => ` Sin datos en la última lectura: ${banks}.`,
   },
   en: {
@@ -198,9 +220,13 @@ const TEXTS = {
     title: "Dollar Board",
     subtitle: date => `Reading from ${date} (Bolivia time), in bolivianos per dollar`,
     officialLabel: "BCB official",
+    parallelLabel: "Parallel",
     languageLabel: "Language",
-    cheapestSell: "Cheapest place to buy dollars",
-    bestBuy: "Best price for selling your dollars",
+    bestDeal: "Best deal today",
+    toBuy: "To buy dollars",
+    toBuyDetail: price => `sells at Bs ${price}, the lowest sell`,
+    toSell: "To sell your dollars",
+    toSellDetail: price => `buys at Bs ${price}, the highest buy`,
     averageGap: "Average gap between sell and buy",
     acrossBanks: n => `across ${n} banks`,
     byBank: "Buy and sell by bank",
@@ -214,16 +240,17 @@ const TEXTS = {
     viewDay: "Daily sell candles",
     viewWeek: "Weekly sell candles",
     bestOverall: "Best price across all banks",
-    oneReading: "Only one reading is saved. Lines and candles appear from the second one; readings are taken every day at 08:00 and 20:00.",
+    oneReading: "Only one reading is saved. Lines and candles appear from the second one; readings are taken every day at 07:00, 13:00 and 19:00.",
     noBankData: "This bank has no data in the saved readings.",
     noSellData: "This bank does not publish a sell price in the saved readings.",
-    candleNote: weekly => `Each candle summarises the sell price for ${weekly ? "one week" : "one day"}: the body runs from the first to the last reading (green if it rose, red if it fell, grey if unchanged) and the wick marks the high and the low. The dashed line is the BCB official rate.`,
+    candleNote: weekly => `Each candle summarises the sell price for ${weekly ? "one week" : "one day"}: the body runs from the first to the last reading (green if it rose, red if it fell, grey if unchanged) and the wick marks the high and the low. The solid line is the BCB official rate.`,
     open: "Open", high: "High", low: "Low", close: "Close",
     readingCount: n => `${n} ${n === 1 ? "reading" : "readings"}`,
     weekOf: date => `Week of ${date}`,
     linesAria: "Dollar buy and sell prices over time",
     candlesAria: weekly => `Dollar sell price candles by ${weekly ? "week" : "day"}`,
-    footer: n => `${n} saved ${n === 1 ? "reading" : "readings"}, taken from each bank's public website. Ganadero only publishes a reference sell value.`,
+    footer: n => `${n} saved ${n === 1 ? "reading" : "readings"}, taken from each bank's public website. Ganadero only publishes a reference sell value. The parallel rate is USDT on Binance P2P: midpoint between buy and sell.`,
+    subscribe: "Get the daily summary by email",
     missing: banks => ` No data in the latest reading: ${banks}.`,
   },
 };
@@ -250,15 +277,25 @@ const dayToIso = day => `${day}T12:00:00-04:00`; // noon in Bolivia, safely insi
 const readings = DATA.readings;
 const latest = readings[readings.length - 1], previous = readings[readings.length - 2];
 const officialOf = reading => {
-  if (reading.banks.BCB && reading.banks.BCB.official != null) return reading.banks.BCB.official;
+  const own = reading.banks.BCB;
+  if (own && own.official != null) return own.official;
   const quote = Object.values(reading.banks).find(q => q.official != null);
   return quote ? quote.official : null;
 };
+const OFFICIAL_SOURCE = "BCB", PARALLEL_SOURCE = "Parallel";
+const REFERENCE_SOURCES = [OFFICIAL_SOURCE, PARALLEL_SOURCE];
+// The parallel-market rate: midpoint between its buy and sell prices.
+const parallelOf = reading => {
+  const quote = reading.banks[PARALLEL_SOURCE] || {};
+  const present = [quote.buy, quote.sell].filter(v => v != null);
+  return present.length ? present.reduce((a, b) => a + b, 0) / present.length : null;
+};
+const displayName = name => name === PARALLEL_SOURCE ? text().parallelLabel : name;
 const pricedBanks = reading => Object.entries(reading.banks)
-  .filter(([, q]) => q.buy != null || q.sell != null)
+  .filter(([name, q]) => !REFERENCE_SOURCES.includes(name) && (q.buy != null || q.sell != null))
   .map(([name, q]) => ({ name, ...q }));
 
-const official = officialOf(latest);
+const official = officialOf(latest), parallel = parallelOf(latest);
 const rows = pricedBanks(latest).sort((a, b) =>
   (a.sell == null) - (b.sell == null) || a.sell - b.sell || (b.buy ?? 0) - (a.buy ?? 0) || a.name.localeCompare(b.name));
 const withSell = rows.filter(r => r.sell != null), withBuy = rows.filter(r => r.buy != null);
@@ -268,7 +305,7 @@ const gaps = rows.filter(r => r.buy != null && r.sell != null).map(r => r.sell -
 const averageGap = gaps.reduce((a, b) => a + b, 0) / (gaps.length || 1);
 
 // shared horizontal scale of the by-bank chart
-const allValues = rows.flatMap(r => [r.buy, r.sell]).concat(official).filter(v => v != null);
+const allValues = rows.flatMap(r => [r.buy, r.sell]).concat(official, parallel).filter(v => v != null);
 const scaleMin = Math.floor((Math.min(...allValues) - 0.1) * 2) / 2;
 const scaleMax = Math.ceil((Math.max(...allValues) + 0.1) * 2) / 2;
 const percent = v => ((v - scaleMin) / (scaleMax - scaleMin) * 100).toFixed(2) + "%";
@@ -278,6 +315,8 @@ for (let t = scaleMin; t <= scaleMax + 1e-9; t += tickStep) ticks.push(t);
 
 const BEST = "__best__";
 const bankNames = [...new Set(readings.flatMap(r => pricedBanks(r).map(b => b.name)))].sort((a, b) => a.localeCompare(b));
+const hasParallelHistory = readings.some(r => parallelOf(r) != null);
+const historyKeys = hasParallelHistory ? [...bankNames, PARALLEL_SOURCE] : bankNames;
 const missingSources = (DATA.sources || []).filter(name => !latest.banks[name]);
 
 /* ---------- header, facts and by-bank chart ---------- */
@@ -288,17 +327,23 @@ function renderStaticText() {
   byId("lang-toggle").setAttribute("aria-label", text().languageLabel);
   byId("subtitle").textContent = text().subtitle(formatLongDate(latest.t));
   byId("official").textContent = formatNumber(official);
-  byId("footer").textContent = text().footer(readings.length) +
-    (missingSources.length ? text().missing(missingSources.join(", ")) : "");
+  byId("parallel").textContent = formatNumber(parallel);
+  byId("footer-text").textContent = text().footer(readings.length) +
+    (missingSources.length ? text().missing(missingSources.map(displayName).join(", ")) : "");
+  const subscribeLink = byId("subscribe-link");
+  subscribeLink.hidden = !DATA.subscribeUrl;
+  if (DATA.subscribeUrl) { subscribeLink.href = DATA.subscribeUrl; subscribeLink.textContent = text().subscribe; }
 }
 
+// Best deal today: the lowest sell for buyers, the highest buy for sellers.
 function renderFacts() {
-  const fact = (label, value, detail) => `<div><dt>${label}</dt>
-    <dd><span class="num">${formatNumber(value)}</span><span class="who">${escapeHtml(detail)}</span></dd></div>`;
+  const deal = (label, winners, detail) => `<div><dt>${label}</dt>
+    <dd><span class="winner">${escapeHtml(winners || "—")}</span><span class="who">${detail}</span></dd></div>`;
   byId("facts").innerHTML =
-    fact(text().cheapestSell, minSell, namesWith(withSell, "sell", minSell)) +
-    fact(text().bestBuy, maxBuy, namesWith(withBuy, "buy", maxBuy)) +
-    fact(text().averageGap, averageGap, text().acrossBanks(gaps.length));
+    deal(text().toBuy, namesWith(withSell, "sell", minSell), text().toBuyDetail(formatNumber(minSell))) +
+    deal(text().toSell, namesWith(withBuy, "buy", maxBuy), text().toSellDetail(formatNumber(maxBuy))) +
+    `<div><dt>${text().averageGap}</dt>
+    <dd><span class="num">${formatNumber(averageGap)}</span><span class="who">${text().acrossBanks(gaps.length)}</span></dd></div>`;
 }
 
 function changeHtml(row, key) {
@@ -311,7 +356,7 @@ function renderBoard() {
   const gridLines = ticks.map(t => `<i class="tick" style="left:${percent(t)}"></i>`).join("");
   const header = `<div class="row columns">
     <span class="label">${text().bank}</span><span class="label num">${text().buy}</span>
-    <div class="track">${ticks.map(t => `<span style="left:${percent(t)}">${formatNumber(t, 1)}</span>`).join("")}</div>
+    <div class="track">${ticks.slice(1, -1).map(t => `<span style="left:${percent(t)}">${formatNumber(t, 1)}</span>`).join("")}</div>
     <span class="label num">${text().sell}</span>
   </div>`;
   byId("board").innerHTML = header + rows.map((r, i) => `
@@ -320,6 +365,7 @@ function renderBoard() {
     <span class="num">${formatNumber(r.buy)}${changeHtml(r, "buy")}</span>
     <div class="track">${gridLines}
       ${official != null ? `<i class="official-mark" style="left:${percent(official)}"></i>` : ""}
+      ${parallel != null ? `<i class="parallel-mark" style="left:${percent(parallel)}"></i>` : ""}
       ${r.buy != null && r.sell != null ? `<i class="bar" style="left:${percent(r.buy)};width:${((r.sell - r.buy) / (scaleMax - scaleMin) * 100).toFixed(2)}%"></i>` : ""}
       ${r.buy != null ? `<i class="dot buy" style="left:${percent(r.buy)}"></i>` : ""}
       ${r.sell != null ? `<i class="dot sell" style="left:${percent(r.sell)}"></i>` : ""}
@@ -366,8 +412,8 @@ const bankSelect = byId("bank-select"), viewSelect = byId("view-select"), histor
 function renderBankOptions() {
   const selected = bankSelect.value || readStored("bank") || BEST;
   bankSelect.innerHTML = `<option value="${BEST}">${text().bestOverall}</option>` +
-    bankNames.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-  bankSelect.value = [BEST, ...bankNames].includes(selected) ? selected : BEST;
+    historyKeys.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(displayName(n))}</option>`).join("");
+  bankSelect.value = [BEST, ...historyKeys].includes(selected) ? selected : BEST;
 }
 
 // One point per reading for the chosen bank, or the best price across all banks.
@@ -379,7 +425,7 @@ function seriesFor(key) {
       const buys = banks.map(b => b.buy).filter(v => v != null), sells = banks.map(b => b.sell).filter(v => v != null);
       buy = buys.length ? Math.max(...buys) : null; sell = sells.length ? Math.min(...sells) : null;
     } else if (reading.banks[key]) { buy = reading.banks[key].buy; sell = reading.banks[key].sell; }
-    return { t: reading.t, ms: Date.parse(reading.t), buy, sell, official: officialOf(reading) };
+    return { t: reading.t, ms: Date.parse(reading.t), buy, sell, official: officialOf(reading), parallel: parallelOf(reading) };
   });
 }
 
@@ -443,7 +489,7 @@ function drawCandles(points, weekly) {
   const officialPoints = candles.map((c, i) => c.official == null ? "" : `${x(i).toFixed(1)},${y(c.official).toFixed(1)}`).filter(Boolean);
   historyPanel.innerHTML = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"
       aria-label="${text().candlesAria(weekly)}">${marks}
-    ${officialPoints.length > 1 ? `<polyline points="${officialPoints.join(" ")}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.7"/>` : ""}
+    ${officialPoints.length > 1 ? `<polyline points="${officialPoints.join(" ")}" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.7"/>` : ""}
     <line id="crosshair" y1="${margin.top}" y2="${height - margin.bottom}" stroke="var(--axis)" stroke-width="1" visibility="hidden"/>
   </svg>
   <p class="note">${text().candleNote(weekly)}</p>`;
@@ -460,7 +506,7 @@ function drawCandles(points, weekly) {
 }
 
 function drawLines(points) {
-  const values = points.flatMap(p => [p.buy, p.sell, p.official]).filter(v => v != null);
+  const values = points.flatMap(p => [p.buy, p.sell, p.official, p.parallel]).filter(v => v != null);
   if (!values.length) { historyPanel.innerHTML = `<p class="empty">${text().noBankData}</p>`; return; }
   const width = chartWidth(), height = CHART_HEIGHT;
   const margin = { top: 16, right: 96, bottom: 28, left: 44 };
@@ -470,11 +516,12 @@ function drawLines(points) {
   const y = v => margin.top + (domain.max - v) / (domain.max - domain.min || 1) * (height - margin.top - margin.bottom);
   const path = key => points.filter(p => p[key] != null).map((p, i) => `${i ? "L" : "M"}${x(p.ms).toFixed(1)},${y(p[key]).toFixed(1)}`).join("");
   let marks = yGridSvg(domain, y, margin.left, width - margin.right);
-  const labelCount = Math.min(points.length, Math.max(2, Math.floor((width - margin.left - margin.right) / 90)));
+  const spansFewDays = lastMs - firstMs < 3 * 24 * 3600 * 1000; // then the time of day matters
+  const labelCount = Math.min(points.length, Math.max(2, Math.floor((width - margin.left - margin.right) / (spansFewDays ? 130 : 90))));
   for (let i = 0; i < labelCount; i++) {
     const p = points[Math.round(i * (points.length - 1) / (labelCount - 1))];
     const anchor = i === 0 ? "start" : i === labelCount - 1 ? "end" : "middle";
-    marks += `<text x="${x(p.ms)}" y="${height - 8}" text-anchor="${anchor}">${formatShortDate(p.t)}</text>`;
+    marks += `<text x="${x(p.ms)}" y="${height - 8}" text-anchor="${anchor}">${spansFewDays ? formatShortDateTime(p.t) : formatShortDate(p.t)}</text>`;
   }
   const lastWith = key => [...points].reverse().find(p => p[key] != null);
   const series = [["sell", text().sell, "var(--sell)"], ["buy", text().buy, "var(--buy)"]]
@@ -488,7 +535,8 @@ function drawLines(points) {
   }
   historyPanel.innerHTML = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"
       aria-label="${text().linesAria}">${marks}
-    <path d="${path("official")}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.7"/>
+    <path d="${path("official")}" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.7"/>
+    <path d="${path("parallel")}" fill="none" stroke="var(--parallel)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.9"/>
     ${series.map(s => `<path d="${path(s.key)}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
       <circle cx="${x(s.point.ms)}" cy="${y(s.point[s.key])}" r="4.5" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>
       <text class="end-label" x="${width - margin.right + 10}" y="${s.labelY + 4}">${s.name} ${formatNumber(s.point[s.key])}</text>`).join("")}
@@ -500,7 +548,7 @@ function drawLines(points) {
     const p = points.reduce((a, b) => Math.abs(x(b.ms) - mouseX) < Math.abs(x(a.ms) - mouseX) ? b : a);
     crosshair.setAttribute("x1", x(p.ms)); crosshair.setAttribute("x2", x(p.ms)); crosshair.setAttribute("visibility", "visible");
     const panel = historyPanel.getBoundingClientRect();
-    showTooltip(historyPanel, `<b>${formatShortDateTime(p.t)}</b>${text().sell} ${formatNumber(p.sell)}<br>${text().buy} ${formatNumber(p.buy)}<br>${text().official} ${formatNumber(p.official)}`,
+    showTooltip(historyPanel, `<b>${formatShortDateTime(p.t)}</b>${text().sell} ${formatNumber(p.sell)}<br>${text().buy} ${formatNumber(p.buy)}<br>${text().official} ${formatNumber(p.official)}<br>${text().parallelLabel} ${formatNumber(p.parallel)}`,
       e.clientX - panel.left, e.clientY - panel.top);
   });
   svg.addEventListener("mouseleave", () => { crosshair.setAttribute("visibility", "hidden"); hideTooltip(); });

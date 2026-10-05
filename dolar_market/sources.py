@@ -1,23 +1,28 @@
 """The quote sources, declared as data.
 
-SOURCES maps each bank to a zero-argument function that returns its Quote.
-Those functions are built by composing a download (the only side effect in this
-module) with pure functions that interpret the response. If a site changes, only
-its entry fails; the rest keep working.
+SOURCES maps each name to a Source: where to download from and a pure `parse`
+function that turns the raw response into a Quote. Calling a Source performs the
+download (the only side effect in this module) and parses it. If a site changes,
+only its entry fails; the rest keep working.
 """
 
 import html
+import json
 import re
 import ssl
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from types import MappingProxyType
+from typing import NamedTuple
 
 import requests
 from requests.adapters import HTTPAdapter
 
 from .models import Quote
 
-Source = Callable[[], Quote]
+# Names of the sources that are market references rather than banks.
+OFFICIAL_SOURCE = "BCB"
+PARALLEL_SOURCE = "Parallel"
+REFERENCE_SOURCES = frozenset({OFFICIAL_SOURCE, PARALLEL_SOURCE})
 
 HEADERS = MappingProxyType(
     {
@@ -91,31 +96,41 @@ def fetch(url, method="GET", legacy_tls=False, headers=HEADERS, **request) -> re
     return response
 
 
-# --- Source builders -----------------------------------------------------------
+# --- Sources: a download description plus a pure parser -----------------------
+
+
+class Source(NamedTuple):
+    """Where a quote comes from and how to read it."""
+
+    url: str
+    parse: Callable[[bytes], Quote]  # pure: raw response body -> Quote
+    request: Mapping = MappingProxyType({})  # extra arguments for `fetch`
+
+    def __call__(self) -> Quote:
+        return self.parse(fetch(self.url, **self.request).content)
 
 
 def from_html(url: str, legacy_tls=False, **patterns) -> Source:
-    """Source that downloads a page and searches its visible text for the patterns."""
+    """Source whose page is searched, as visible text, for one pattern per value."""
 
-    def get_quote() -> Quote:
-        page = fetch(url, legacy_tls=legacy_tls).content.decode("utf-8", errors="replace")
-        return extract(to_plain_text(page), **patterns)
+    def parse(body: bytes) -> Quote:
+        return extract(to_plain_text(body.decode("utf-8", errors="replace")), **patterns)
 
-    return get_quote
+    return Source(url, parse, {"legacy_tls": legacy_tls})
 
 
 def from_json(url: str, read: Callable[[dict], Quote], **request) -> Source:
-    """Source that downloads a JSON document and turns it into a Quote with `read`."""
+    """Source that answers with JSON, turned into a Quote by `read`."""
 
-    def get_quote() -> Quote:
-        return read(fetch(url, **request).json())
+    def parse(body: bytes) -> Quote:
+        return read(json.loads(body))
 
-    return get_quote
+    return Source(url, parse, request)
 
 
 SOURCES: MappingProxyType[str, Source] = MappingProxyType(
     {
-        "BCB": from_html(
+        OFFICIAL_SOURCE: from_html(
             "https://www.bcb.gob.bo/",
             official=rf"Tipo de cambio oficial.{{0,200}}?Bs\W{{0,10}}{NUM}",
         ),
@@ -173,6 +188,12 @@ SOURCES: MappingProxyType[str, Source] = MappingProxyType(
                 d["response"]["saleExchange"],
                 d["response"]["officialExchange"],
             ),
+        ),
+        # Parallel market: USDT/BOB on Binance P2P, as aggregated by CriptoYa.
+        # "bid" is what the market pays for a dollar and "ask" what it charges.
+        PARALLEL_SOURCE: from_json(
+            "https://criptoya.com/api/binancep2p/USDT/BOB/1",
+            lambda d: make_quote(buy=d["bid"], sell=d["ask"]),
         ),
         "Prodem": from_html(
             "https://www.prodem.bo/Inicio",

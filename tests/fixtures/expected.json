@@ -1,0 +1,67 @@
+{
+  "BCB": {
+    "buy": null,
+    "sell": null,
+    "official": 12.0
+  },
+  "BNB": {
+    "buy": 11.5,
+    "sell": 12.3,
+    "official": 12.0
+  },
+  "BCP": {
+    "buy": 11.5,
+    "sell": 12.3,
+    "official": null
+  },
+  "BISA": {
+    "buy": 11.3,
+    "sell": 12.3,
+    "official": null
+  },
+  "Mercantil Santa Cruz": {
+    "buy": 10.9,
+    "sell": 12.3,
+    "official": 12.0
+  },
+  "Banco Unión": {
+    "buy": 11.0,
+    "sell": 12.3,
+    "official": 12.0
+  },
+  "Ganadero": {
+    "buy": null,
+    "sell": 12.3,
+    "official": 12.0
+  },
+  "Económico": {
+    "buy": 11.3,
+    "sell": 12.35,
+    "official": 12.0
+  },
+  "FIE": {
+    "buy": 11.5,
+    "sell": 12.0,
+    "official": 12.0
+  },
+  "BancoSol": {
+    "buy": 10.8,
+    "sell": 12.3,
+    "official": 12.0
+  },
+  "Fortaleza": {
+    "buy": 11.7,
+    "sell": 12.3,
+    "official": 12.0
+  },
+  "Parallel": {
+    "buy": 11.98,
+    "sell": 12.02,
+    "official": null
+  },
+  "Prodem": {
+    "buy": 11.7,
+    "sell": 12.1,
+    "official": 12.0
+  }
+}

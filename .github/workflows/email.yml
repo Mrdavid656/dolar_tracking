@@ -1,0 +1,33 @@
+name: Daily email
+
+# Sends the summary of the latest reading to every subscriber.
+
+on:
+  schedule:
+    - cron: "0 13 * * *" # 09:00 Bolivia time (UTC-4)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Send email
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          SUBSCRIBERS_URL: ${{ secrets.SUBSCRIBERS_URL }}
+          MAIL_LANG: ${{ vars.MAIL_LANG }}
+        run: |
+          export DASHBOARD_URL="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/"
+          python -m dolar_market.mailer
