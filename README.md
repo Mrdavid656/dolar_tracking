@@ -14,10 +14,15 @@ the parallel market.
 
 - **Best deal today:** the bank that sells the dollar cheapest and the bank that pays the
   most for it.
+- **The gap:** how far the parallel rate sits above or below the official one, and what
+  moved since yesterday.
 - **Buy and sell by bank:** every bank on the same scale, next to the official and the
-  parallel rate.
-- **History:** how each bank's prices have moved, as lines or as daily and weekly candles.
+  parallel rate. Each name links to the bank's own site.
+- **History:** how each bank's prices and the gap have moved, as lines or as daily and
+  weekly candles.
 - **Spanish and English**, with a switch at the top of the page.
+
+![The board: reference rates, best deals, every bank on one scale, and the history chart](docs/dashboard.png)
 
 Prices are read three times a day, at 07:00, 13:00 and 19:00 (Bolivia time). The email
 summary goes out at 08:00.
@@ -32,7 +37,8 @@ the midpoint between its buy and sell prices.
 ## The data
 
 Every reading is kept in [`data/rates.csv`](data/rates.csv), one row per source, in
-bolivianos per dollar. You are welcome to use it.
+bolivianos per dollar. You are welcome to use it; the latest copy can be downloaded from
+https://mrdavid656.github.io/dolar_tracking/rates.csv.
 
 | column | meaning |
 |---|---|
