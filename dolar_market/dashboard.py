@@ -6,7 +6,8 @@ Writes two files with the same content:
     dashboard.html   the page body alone, as an artifact host expects it
     site/index.html  a complete HTML document, served by GitHub Pages
 
-The optional SUBSCRIBE_URL environment variable adds a "subscribe" link.
+Optional environment variables: SUBSCRIBE_URL adds a "subscribe" button and
+CONTACT_EMAIL overrides the address shown in the footer.
 """
 
 import json
@@ -23,6 +24,7 @@ TEMPLATE = Path(__file__).with_name("dashboard_template.html")
 FRAGMENT_OUTPUT = ROOT / "dashboard.html"
 SITE_OUTPUT = ROOT / "site" / "index.html"
 MARKER = "/*DATA*/"
+CONTACT_EMAIL = "davidgemio98@gmail.com"
 DOCUMENT = """<!doctype html>
 <html lang="es">
 <head>
@@ -37,11 +39,17 @@ DOCUMENT = """<!doctype html>
 """
 
 
-def to_payload(readings: Sequence[Reading], sources: Iterable[str], subscribe_url: str | None = None) -> dict:
+def to_payload(
+    readings: Sequence[Reading],
+    sources: Iterable[str],
+    subscribe_url: str | None = None,
+    contact_email: str | None = CONTACT_EMAIL,
+) -> dict:
     """The structure consumed by the template's JavaScript."""
     return {
         "sources": list(sources),
         "subscribeUrl": subscribe_url or None,
+        "contactEmail": contact_email or None,
         "readings": [
             {
                 "t": reading.timestamp,
@@ -66,7 +74,8 @@ def to_document(fragment: str) -> str:
 
 def main() -> None:
     readings = read_readings()
-    payload = to_payload(readings, SOURCES, os.environ.get("SUBSCRIBE_URL"))
+    env = os.environ
+    payload = to_payload(readings, SOURCES, env.get("SUBSCRIBE_URL"), env.get("CONTACT_EMAIL") or CONTACT_EMAIL)
     fragment = embed(TEMPLATE.read_text(encoding="utf-8"), payload)
     FRAGMENT_OUTPUT.write_text(fragment, encoding="utf-8")
     SITE_OUTPUT.parent.mkdir(exist_ok=True)

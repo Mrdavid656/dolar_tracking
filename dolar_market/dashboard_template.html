@@ -104,11 +104,14 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #history svg { display: block; width: 100%; height: auto; }
 #history text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
 #history text.end-label { font-family: var(--body); font-size: 12px; fill: var(--ink-2); }
-.note { color: var(--ink-2); font-size: 13px; margin: 8px 0 0; max-width: 70ch; }
-.empty { color: var(--ink-2); margin: 0; padding: 28px 0 20px; max-width: 60ch; }
+.note { color: var(--ink-2); font-size: 13px; margin: 10px 0 0; text-align: center; text-wrap: balance; }
+.empty { color: var(--ink-2); margin: 0; padding: 36px 0 28px; text-align: center; text-wrap: balance; }
 .subscribe { display: inline-block; margin-top: 14px; padding: 7px 14px; border: 1px solid var(--accent); border-radius: 4px; color: var(--accent); font-size: 14px; font-weight: 600; text-decoration: none; }
 .subscribe:hover, .subscribe:focus-visible { background: var(--accent); color: var(--bg); outline: none; }
-footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid); padding-top: 14px; max-width: 70ch; }
+footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid); padding-top: 18px; text-align: center; text-wrap: balance; }
+footer p { margin: 0; }
+footer a { color: var(--accent); }
+footer p + p { margin-top: 6px; }
 </style>
 
 <div class="wrap">
@@ -171,7 +174,10 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid)
     <div class="panel" id="history"></div>
   </section>
 
-  <footer id="footer-text"></footer>
+  <footer>
+    <p><span id="footer-text"></span> <a id="contact-link" hidden></a></p>
+    <p id="missing-notice" hidden></p>
+  </footer>
 </div>
 
 <script>
@@ -213,9 +219,9 @@ const TEXTS = {
     weekOf: date => `Semana del ${date}`,
     linesAria: "Compra y venta del dólar a lo largo del tiempo",
     candlesAria: weekly => `Velas del precio de venta del dólar por ${weekly ? "semana" : "día"}`,
-    footer: n => `${n} ${n === 1 ? "lectura guardada" : "lecturas guardadas"}, tomadas de los sitios públicos de cada banco. Ganadero solo publica un valor referencial de venta. El paralelo es el USDT en Binance P2P: punto medio entre compra y venta.`,
+    footer: "Proyecto personal con fines informativos. Para sugerencias o reportar un error, escribe a",
     subscribe: "Recibir el resumen diario por correo",
-    missing: banks => ` Sin datos en la última lectura: ${banks}.`,
+    missing: banks => `Sin datos en la última lectura: ${banks}.`,
   },
   en: {
     locale: "en-GB",
@@ -251,9 +257,9 @@ const TEXTS = {
     weekOf: date => `Week of ${date}`,
     linesAria: "Dollar buy and sell prices over time",
     candlesAria: weekly => `Dollar sell price candles by ${weekly ? "week" : "day"}`,
-    footer: n => `${n} saved ${n === 1 ? "reading" : "readings"}, taken from each bank's public website. Ganadero only publishes a reference sell value. The parallel rate is USDT on Binance P2P: midpoint between buy and sell.`,
+    footer: "Personal project for informational purposes. For suggestions or to report an error, write to",
     subscribe: "Get the daily summary by email",
-    missing: banks => ` No data in the latest reading: ${banks}.`,
+    missing: banks => `No data in the latest reading: ${banks}.`,
   },
 };
 
@@ -330,8 +336,13 @@ function renderStaticText() {
   byId("subtitle").textContent = text().subtitle(formatLongDate(latest.t));
   byId("official").textContent = formatNumber(official);
   byId("parallel").textContent = formatNumber(parallel);
-  byId("footer-text").textContent = text().footer(readings.length) +
-    (missingSources.length ? text().missing(missingSources.map(displayName).join(", ")) : "");
+  byId("footer-text").textContent = text().footer;
+  const contactLink = byId("contact-link");
+  contactLink.hidden = !DATA.contactEmail;
+  if (DATA.contactEmail) { contactLink.href = `mailto:${DATA.contactEmail}`; contactLink.textContent = DATA.contactEmail; }
+  const missingNotice = byId("missing-notice");
+  missingNotice.hidden = !missingSources.length;
+  missingNotice.textContent = missingSources.length ? text().missing(missingSources.map(displayName).join(", ")) : "";
   const subscribeLink = byId("subscribe-link");
   subscribeLink.hidden = !DATA.subscribeUrl;
   if (DATA.subscribeUrl) { subscribeLink.href = DATA.subscribeUrl; subscribeLink.textContent = text().subscribe; }
