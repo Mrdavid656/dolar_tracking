@@ -6,6 +6,7 @@ Writes the dashboard twice, with the same content, plus the privacy policy:
     dashboard.html     the page body alone, as an artifact host expects it
     site/index.html    a complete HTML document, served by GitHub Pages
     site/privacy.html  a copy of privacy.html
+and copies the share image and the icon from static/ into site/.
 
 Optional environment variables: SUBSCRIBE_URL adds a "subscribe" button and
 CONTACT_EMAIL overrides the address shown in the footer.
@@ -25,7 +26,15 @@ TEMPLATE = Path(__file__).with_name("dashboard_template.html")
 FRAGMENT_OUTPUT = ROOT / "dashboard.html"
 SITE_OUTPUT = ROOT / "site" / "index.html"
 PRIVACY_PAGE = Path(__file__).with_name("privacy.html")
-PRIVACY_URL = "https://mrdavid656.github.io/dolar_tracking/privacy.html"
+STATIC = Path(__file__).with_name("static")
+STATIC_FILES = ("og.png", "favicon.svg")  # og_image.html is only the source of og.png
+SITE_URL = "https://mrdavid656.github.io/dolar_tracking/"
+PRIVACY_URL = SITE_URL + "privacy.html"
+SITE_TITLE = "Pizarra del Dólar"
+SITE_DESCRIPTION = (
+    "Compra y venta del dólar en los bancos de Bolivia, junto al oficial del BCB y el paralelo. "
+    "Actualizado tres veces al día."
+)
 MARKER = "/*DATA*/"
 CONTACT_EMAIL = "davidgemio98@gmail.com"
 DOCUMENT = """<!doctype html>
@@ -33,6 +42,23 @@ DOCUMENT = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<meta name="description" content="{description}">
+<meta name="theme-color" content="#0d0f0e">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="canonical" href="{site_url}">
+<!-- Open Graph: the card shown when the link is shared -->
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_BO">
+<meta property="og:site_name" content="{title}">
+<meta property="og:title" content="{title}">
+<meta property="og:description" content="{description}">
+<meta property="og:url" content="{site_url}">
+<meta property="og:image" content="{site_url}og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{title}">
+<meta name="twitter:card" content="summary_large_image">
 <style>body {{ margin: 0; }} [hidden] {{ display: none !important; }}</style>
 </head>
 <body>
@@ -74,7 +100,7 @@ def embed(template: str, payload: dict) -> str:
 
 def to_document(fragment: str) -> str:
     """Wrap the page body in a complete HTML document."""
-    return DOCUMENT.format(body=fragment)
+    return DOCUMENT.format(body=fragment, title=SITE_TITLE, description=SITE_DESCRIPTION, site_url=SITE_URL)
 
 
 def main() -> None:
@@ -86,6 +112,8 @@ def main() -> None:
     SITE_OUTPUT.parent.mkdir(exist_ok=True)
     SITE_OUTPUT.write_text(to_document(fragment), encoding="utf-8")
     (SITE_OUTPUT.parent / PRIVACY_PAGE.name).write_text(PRIVACY_PAGE.read_text(encoding="utf-8"), encoding="utf-8")
+    for name in STATIC_FILES:
+        (SITE_OUTPUT.parent / name).write_bytes((STATIC / name).read_bytes())
     print(f"{len(readings)} readings -> {FRAGMENT_OUTPUT} and {SITE_OUTPUT}")
 
 

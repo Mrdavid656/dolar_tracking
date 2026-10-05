@@ -1,0 +1,39 @@
+<!doctype html>
+<!-- Source of og.png, the image shown when the site's link is shared.
+     To regenerate: open this file in a 1200x630 headless Chrome and take a screenshot. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+body { background: #0d0f0e; color: #f4f6f3; font-family: "IBM Plex Sans", "Segoe UI", sans-serif; display: flex; flex-direction: column; justify-content: space-between; box-sizing: border-box; padding: 72px 80px 64px; }
+h1 { font-family: "Archivo", "Arial Narrow", sans-serif; font-stretch: 80%; font-weight: 800; font-size: 132px; line-height: 1; letter-spacing: -0.01em; margin: 0; }
+.rule { height: 4px; background: #f4f6f3; margin: 30px 0 28px; }
+p { font-size: 36px; line-height: 1.35; color: #c0c5bf; margin: 0; max-width: 940px; }
+/* Three rows of the buy/sell chart, as a motif: no figures, so it never goes stale. */
+.chart { position: relative; height: 150px; }
+.row { position: absolute; left: 0; right: 0; height: 2px; background: #2a2d2b; }
+.bar { position: absolute; height: 8px; margin-top: -3px; border-radius: 4px; background: #3a3e3b; }
+.dot { position: absolute; width: 26px; height: 26px; margin: -12px 0 0 -13px; border-radius: 50%; }
+.buy { background: #3987e5; } .sell { background: #d95926; }
+.official { position: absolute; top: -14px; bottom: -14px; left: 70%; width: 4px; margin-left: -2px; background: #6fcfb4; }
+.parallel { position: absolute; top: -14px; bottom: -14px; left: 73%; width: 0; border-left: 4px dashed #a79df0; }
+.url { position: absolute; right: 80px; top: 86px; font-size: 24px; color: #898f89; }
+</style>
+</head>
+<body>
+  <div>
+    <h1>Pizarra del Dólar</h1>
+    <div class="rule"></div>
+    <p>Compra y venta del dólar en los bancos de Bolivia, junto al oficial del BCB y el paralelo.</p>
+  </div>
+  <div class="chart">
+    <div class="official"></div>
+    <div class="parallel"></div>
+    <div class="row" style="top: 20px"><i class="bar" style="left: 46%; width: 24%"></i><i class="dot buy" style="left: 46%"></i><i class="dot sell" style="left: 70%"></i></div>
+    <div class="row" style="top: 75px"><i class="bar" style="left: 34%; width: 44%"></i><i class="dot buy" style="left: 34%"></i><i class="dot sell" style="left: 78%"></i></div>
+    <div class="row" style="top: 130px"><i class="bar" style="left: 22%; width: 58%"></i><i class="dot buy" style="left: 22%"></i><i class="dot sell" style="left: 80%"></i></div>
+  </div>
+</body>
+</html>

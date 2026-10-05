@@ -219,4 +219,7 @@ def test_payload_and_document():
     payload = dashboard.to_payload(READINGS, ["Alpha"], "https://example.com/form")
     assert payload["subscribeUrl"] == "https://example.com/form"
     assert payload["readings"][0]["banks"]["Beta"] == {"buy": None, "sell": 12.1, "official": None}
-    assert dashboard.to_document("<p>hi</p>").startswith("<!doctype html>")
+    document = dashboard.to_document("<p>hi</p>")
+    assert document.startswith("<!doctype html>")
+    assert '<meta property="og:image" content="https://mrdavid656.github.io/dolar_tracking/og.png">' in document
+    assert "{" not in document.split("<style>")[0]  # every placeholder in the head was filled

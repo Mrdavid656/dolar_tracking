@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- One row of the buy/sell chart: buy dot, sell dot, and the official-rate line. -->
+  <rect width="64" height="64" rx="12" fill="#0d0f0e"/>
+  <rect x="40" y="12" width="4" height="40" rx="2" fill="#6fcfb4"/>
+  <rect x="16" y="29" width="34" height="6" rx="3" fill="#3a3e3b"/>
+  <circle cx="16" cy="32" r="9" fill="#3987e5"/>
+  <circle cx="50" cy="32" r="9" fill="#d95926"/>
+</svg>
