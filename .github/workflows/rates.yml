@@ -1,0 +1,44 @@
+name: Rates
+
+on:
+  schedule:
+    - cron: "0 12 * * *" # 08:00 Bolivia time (UTC-4)
+    - cron: "0 0 * * *" # 20:00 Bolivia time
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: rates
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - run: pip install -r requirements.txt
+
+      - name: Query banks
+        run: python -m dolar_market.scrape
+
+      - name: Save dataset
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/rates.csv
+          git diff --cached --quiet || git commit -m "Rates $(TZ=America/La_Paz date '+%Y-%m-%d %H:%M')"
+          git push
+
+      # The email goes out only with the morning reading (and on manual runs).
+      - name: Send email
+        if: github.event.schedule != '0 0 * * *'
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          MAIL_LANG: ${{ vars.MAIL_LANG }}
+        run: python -m dolar_market.mailer
