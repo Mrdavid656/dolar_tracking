@@ -106,6 +106,12 @@ SHEET = (
 )
 
 
+def test_an_address_that_subscribes_many_times_is_listed_once():
+    sheet = "t,Ana@Example.com,Suscribirme\nt, ana@example.com ,Suscribirme\nt,ANA@EXAMPLE.COM,Suscribirme\n"
+    assert mailer.subscribers_from_sheet(sheet) == ("ana@example.com",)
+    assert mailer.recipients_for("ana@example.com", sheet) == ("ana@example.com",)
+
+
 def test_last_form_answer_decides_the_subscription():
     assert mailer.subscribers_from_sheet(SHEET) == ("luis@example.org", "eva@example.com")
     assert mailer.subscribers_from_sheet(None) == ()

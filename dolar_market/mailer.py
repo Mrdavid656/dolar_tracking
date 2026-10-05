@@ -381,12 +381,13 @@ def button_html(url: str | None, text: Mapping[str, str]) -> str:
 
 def subscription_html(unsubscribe_url: str | None, text: Mapping[str, str]) -> str:
     link = (
-        f' <a href="{unsubscribe_url}" style="color:{INK_2};text-decoration:underline">{text["unsubscribe"]}</a>'
+        f' <a href="{unsubscribe_url}" style="color:{ACCENT};font-weight:700;text-decoration:underline">'
+        f'{text["unsubscribe"]}</a>'
         if unsubscribe_url
         else ""
     )
     return (
-        f'<div style="{SANS};font-size:11px;line-height:17px;color:{MUTED};max-width:600px;padding-top:14px">'
+        f'<div style="{SANS};font-size:13px;line-height:19px;color:{INK_2};max-width:600px;padding-top:16px">'
         f'{text["subscribed"]}{link}</div>'
     )
 
