@@ -105,6 +105,7 @@ class Source(NamedTuple):
     url: str
     parse: Callable[[bytes], Quote]  # pure: raw response body -> Quote
     request: Mapping = MappingProxyType({})  # extra arguments for `fetch`
+    page: str = ""  # where a reader can see the figure
 
     def __call__(self) -> Quote:
         return self.parse(fetch(self.url, **self.request).content)
@@ -116,16 +117,19 @@ def from_html(url: str, legacy_tls=False, **patterns) -> Source:
     def parse(body: bytes) -> Quote:
         return extract(to_plain_text(body.decode("utf-8", errors="replace")), **patterns)
 
-    return Source(url, parse, {"legacy_tls": legacy_tls})
+    return Source(url, parse, {"legacy_tls": legacy_tls}, url)
 
 
-def from_json(url: str, read: Callable[[dict], Quote], **request) -> Source:
-    """Source that answers with JSON, turned into a Quote by `read`."""
+def from_json(url: str, read: Callable[[dict], Quote], page: str, **request) -> Source:
+    """Source that answers with JSON, turned into a Quote by `read`.
+
+    `page` is the site a person would open to see the same figure.
+    """
 
     def parse(body: bytes) -> Quote:
         return read(json.loads(body))
 
-    return Source(url, parse, request)
+    return Source(url, parse, request, page)
 
 
 SOURCES: MappingProxyType[str, Source] = MappingProxyType(
@@ -145,6 +149,7 @@ SOURCES: MappingProxyType[str, Source] = MappingProxyType(
         "Mercantil Santa Cruz": from_json(
             "https://backportal.bmsc.com.bo:1443/api/bmscservices/tipotre",
             lambda d: make_quote(d["compra"], d["venta"], d["oficial"]),
+            page="https://www.bmsc.com.bo/",
         ),
         "Banco Unión": from_html(
             "https://www.bancounion.com.bo/",
@@ -161,10 +166,12 @@ SOURCES: MappingProxyType[str, Source] = MappingProxyType(
         "Económico": from_json(
             "https://www.baneco.com.bo/GetTipoCambio",
             lambda d: make_quote(d["Compra"], d["Venta"], d["Oficial"]),
+            page="https://www.baneco.com.bo/",
         ),
         "FIE": from_json(
             "https://www.bancofie.com.bo/api/tcl",
             lambda d: extract(d["resultado"]["documento"], BUY, SELL, OFFICIAL),
+            page="https://www.bancofie.com.bo/",
             method="POST",
             json={},
             headers={
@@ -188,12 +195,14 @@ SOURCES: MappingProxyType[str, Source] = MappingProxyType(
                 d["response"]["saleExchange"],
                 d["response"]["officialExchange"],
             ),
+            page="https://www.bancofortaleza.com.bo/",
         ),
         # Parallel market: USDT/BOB on Binance P2P, as aggregated by CriptoYa.
         # "bid" is what the market pays for a dollar and "ask" what it charges.
         PARALLEL_SOURCE: from_json(
             "https://criptoya.com/api/binancep2p/USDT/BOB/1",
             lambda d: make_quote(buy=d["bid"], sell=d["ask"]),
+            page="https://criptoya.com/bo",
         ),
         "Prodem": from_html(
             "https://www.prodem.bo/Inicio",

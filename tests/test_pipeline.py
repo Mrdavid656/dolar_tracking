@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from dolar_market import dashboard, mailer
 from dolar_market.models import Quote, Reading, Row
 from dolar_market.scrape import BOLIVIA, Result, is_recent, problem, query, report_line, to_rows
+from dolar_market.sources import Source
 from dolar_market.storage import append_rows, group_readings, read_readings, to_record, to_row
 
 ROWS = (
@@ -216,8 +217,11 @@ def test_embed_cannot_close_the_script_tag():
 
 
 def test_payload_and_document():
-    payload = dashboard.to_payload(READINGS, ["Alpha"], "https://example.com/form")
+    sources = {"Alpha": Source("https://alpha.example/api", lambda body: Quote(), page="https://alpha.example/")}
+    payload = dashboard.to_payload(READINGS, sources, "https://example.com/form")
     assert payload["subscribeUrl"] == "https://example.com/form"
+    assert payload["pages"] == {"Alpha": "https://alpha.example/"}
+    assert payload["dataUrl"].endswith("/rates.csv")
     assert payload["readings"][0]["banks"]["Beta"] == {"buy": None, "sell": 12.1, "official": None}
     document = dashboard.to_document("<p>hi</p>")
     assert document.startswith("<!doctype html>")

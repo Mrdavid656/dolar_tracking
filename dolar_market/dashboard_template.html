@@ -50,6 +50,11 @@ h1 { font-family: var(--display); font-stretch: 80%; font-weight: 800; font-size
 .label { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .metric .num { display: block; font-size: 34px; font-weight: 500; line-height: 1.1; color: var(--accent); }
 .metric.parallel .num { color: var(--parallel); }
+.metric.gap .num { color: var(--ink); }
+a.label, .bank a { color: inherit; text-decoration: none; }
+a.label { color: var(--muted); }
+a.label[href]:hover, a.label[href]:focus-visible, .bank a:hover, .bank a:focus-visible { text-decoration: underline; outline: none; }
+.bank a::after { content: " \2197"; color: var(--muted); font-size: 11px; }
 
 .lang { display: inline-flex; border: 1px solid var(--axis); border-radius: 4px; overflow: hidden; }
 .lang button { font: inherit; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; padding: 4px 10px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer; }
@@ -110,6 +115,7 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #history text.end-value { font-size: 12px; font-weight: 500; }
 #history .legend { padding: 6px 0 2px; }
 .note { color: var(--ink-2); font-size: 13px; margin: 10px 0 0; text-align: center; text-wrap: balance; }
+.download { align-self: flex-end; color: var(--accent); font-size: 13px; }
 .empty { color: var(--ink-2); margin: 0; padding: 36px 0 28px; text-align: center; text-wrap: balance; }
 .subscribe { display: inline-block; margin-top: 14px; padding: 7px 14px; border: 1px solid var(--accent); border-radius: 4px; color: var(--accent); font-size: 14px; font-weight: 600; text-decoration: none; }
 .subscribe:hover, .subscribe:focus-visible { background: var(--accent); color: var(--bg); outline: none; }
@@ -121,10 +127,14 @@ footer p + p { margin-top: 6px; }
 
 /* Phones: figures on one line, the chart on its own line at full width. */
 @media (max-width: 600px) {
-  header { flex-direction: column; align-items: stretch; }
+  header { flex-direction: column; align-items: stretch; position: relative; }
   header > :first-child { flex: none; }
-  .header-side { flex-direction: row-reverse; justify-content: space-between; align-items: flex-end; }
+  h1 { padding-right: 84px; }
+  .lang { position: absolute; top: 4px; right: 0; }
+  .header-side { align-items: stretch; }
+  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .metric { text-align: left; }
+  .metric .num { font-size: clamp(22px, 7vw, 34px); }
   .row { grid-template-columns: minmax(0, 1fr) 4rem 4rem; row-gap: 6px; }
   .row > .track { grid-column: 1 / -1; grid-row: 2; }
   .row .num + .track + .num { text-align: right; }
@@ -147,12 +157,19 @@ footer p + p { margin-top: 6px; }
       </div>
       <div class="metrics">
         <div class="metric">
-          <span class="label" data-i18n="officialLabel"></span>
+          <a class="label" id="official-link" target="_blank" rel="noopener" data-i18n="officialLabel"></a>
           <span class="num" id="official"></span>
+          <span class="change" id="official-change"></span>
         </div>
         <div class="metric parallel">
-          <span class="label" data-i18n="parallelLabel"></span>
+          <a class="label" id="parallel-link" target="_blank" rel="noopener" data-i18n="parallelLabel"></a>
           <span class="num" id="parallel"></span>
+          <span class="change" id="parallel-change"></span>
+        </div>
+        <div class="metric gap" id="gap-metric">
+          <span class="label" data-i18n="gapLabel"></span>
+          <span class="num" id="gap"></span>
+          <span class="change" id="gap-detail"></span>
         </div>
       </div>
     </div>
@@ -185,12 +202,14 @@ footer p + p { margin-top: 6px; }
           <option value="lines" data-i18n="viewLines"></option>
           <option value="day" data-i18n="viewDay"></option>
           <option value="week" data-i18n="viewWeek"></option>
+          <option value="gap" data-i18n="viewGap"></option>
         </select>
-        <label for="bank-select" data-i18n="of"></label>
+        <label for="bank-select" id="bank-label" data-i18n="of"></label>
         <select id="bank-select"></select>
       </div>
     </div>
     <div class="panel" id="history"></div>
+    <a class="download" id="data-link" download data-i18n="download" hidden></a>
   </section>
 
   <footer>
@@ -211,6 +230,13 @@ const TEXTS = {
     subtitle: date => `Última actualización: ${date} (hora de Bolivia). Precios en bolivianos por dólar.`,
     officialLabel: "Oficial BCB",
     parallelLabel: "Paralelo",
+    gapLabel: "Brecha",
+    gapNote: "La brecha es cuánto está el paralelo por encima (+) o por debajo (−) del oficial, en porcentaje del oficial.",
+    bolivianos: amount => `Bs ${amount}`,
+    sinceYesterday: change => `${change} vs. ayer`,
+    sameAsYesterday: "igual que ayer",
+    viewSource: "Ver el precio en su sitio",
+    download: "Descargar todas las lecturas (CSV)",
     languageLabel: "Idioma",
     bestDeal: "Mejor oferta de hoy",
     toBuy: "Para comprar dólares",
@@ -229,6 +255,9 @@ const TEXTS = {
     viewLines: "Líneas de compra y venta",
     viewDay: "Velas de venta por día",
     viewWeek: "Velas de venta por semana",
+    viewGap: "Brecha entre paralelo y oficial",
+    noGapData: "Todavía no hay dos lecturas con oficial y paralelo para dibujar la brecha.",
+    gapAria: "Brecha entre el dólar paralelo y el oficial a lo largo del tiempo",
     bestOverall: "Mejor precio entre todos los bancos",
     oneReading: "Hay una sola lectura guardada. Las líneas y las velas aparecen desde la segunda; las lecturas se toman cada día a las 07:00, 13:00 y 19:00.",
     noBankData: "Este banco no tiene datos en las lecturas guardadas.",
@@ -251,6 +280,13 @@ const TEXTS = {
     subtitle: date => `Last updated: ${date} (Bolivia time). Prices in bolivianos per dollar.`,
     officialLabel: "BCB official",
     parallelLabel: "Parallel",
+    gapLabel: "Gap",
+    gapNote: "The gap is how far the parallel rate sits above (+) or below (−) the official one, as a percentage of the official.",
+    bolivianos: amount => `Bs ${amount}`,
+    sinceYesterday: change => `${change} vs. yesterday`,
+    sameAsYesterday: "same as yesterday",
+    viewSource: "See the price on their site",
+    download: "Download every reading (CSV)",
     languageLabel: "Language",
     bestDeal: "Best deal today",
     toBuy: "To buy dollars",
@@ -269,6 +305,9 @@ const TEXTS = {
     viewLines: "Buy and sell lines",
     viewDay: "Daily sell candles",
     viewWeek: "Weekly sell candles",
+    viewGap: "Gap between parallel and official",
+    noGapData: "There are not yet two readings with both the official and the parallel rate to draw the gap.",
+    gapAria: "Gap between the parallel and the official dollar over time",
     bestOverall: "Best price across all banks",
     oneReading: "Only one reading is saved. Lines and candles appear from the second one; readings are taken every day at 07:00, 13:00 and 19:00.",
     noBankData: "This bank has no data in the saved readings.",
@@ -297,6 +336,9 @@ let lang = TEXTS[readStored("lang")] ? readStored("lang") : "es";
 const text = () => TEXTS[lang];
 const formatNumber = (value, digits = 2) =>
   value == null ? "—" : value.toLocaleString(text().locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+const formatSigned = value => value.toLocaleString(text().locale, { minimumFractionDigits: 2, maximumFractionDigits: 2, signDisplay: "exceptZero" });
+const formatPercent = (value, digits = 1) => value == null ? "—" :
+  (value / 100).toLocaleString(text().locale, { style: "percent", minimumFractionDigits: digits, maximumFractionDigits: digits, signDisplay: "exceptZero" });
 const BOLIVIA = "America/La_Paz";
 const formatLongDate = iso => new Date(iso).toLocaleString(text().locale,
   { timeZone: BOLIVIA, day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
@@ -322,12 +364,25 @@ const parallelOf = reading => {
   const present = [quote.buy, quote.sell].filter(v => v != null);
   return present.length ? present.reduce((a, b) => a + b, 0) / present.length : null;
 };
+// How far the parallel rate sits from the official one, as a percentage of the official.
+const gapOf = reading => {
+  const officialRate = officialOf(reading), parallelRate = parallelOf(reading);
+  return officialRate == null || parallelRate == null ? null : (parallelRate - officialRate) / officialRate * 100;
+};
 const displayName = name => name === PARALLEL_SOURCE ? text().parallelLabel : name;
 const pricedBanks = reading => Object.entries(reading.banks)
   .filter(([name, q]) => !REFERENCE_SOURCES.includes(name) && (q.buy != null || q.sell != null))
   .map(([name, q]) => ({ name, ...q }));
 
 const official = officialOf(latest), parallel = parallelOf(latest);
+// the last reading of the calendar day before the latest one, to tell what moved since
+const dayBefore = new Date(Date.parse(latest.t.slice(0, 10) + "T00:00:00Z") - 24 * 3600 * 1000).toISOString().slice(0, 10);
+const yesterday = [...readings].reverse().find(r => r.t.slice(0, 10) === dayBefore);
+const bestOf = (reading, key, pick) => {
+  const values = reading ? pricedBanks(reading).map(b => b[key]).filter(v => v != null) : [];
+  return values.length ? pick(...values) : null;
+};
+const pages = DATA.pages || {};
 const rows = pricedBanks(latest).sort((a, b) =>
   (a.sell == null) - (b.sell == null) || a.sell - b.sell || (b.buy ?? 0) - (a.buy ?? 0) || a.name.localeCompare(b.name));
 const withSell = rows.filter(r => r.sell != null), withBuy = rows.filter(r => r.buy != null);
@@ -360,6 +415,17 @@ function renderStaticText() {
   byId("subtitle").textContent = text().subtitle(formatLongDate(latest.t));
   byId("official").textContent = formatNumber(official);
   byId("parallel").textContent = formatNumber(parallel);
+  byId("official-change").textContent = sinceYesterday(official, yesterday && officialOf(yesterday));
+  byId("parallel-change").textContent = sinceYesterday(parallel, yesterday && parallelOf(yesterday));
+  byId("gap").textContent = formatPercent(gapOf(latest));
+  byId("gap-detail").textContent = official != null && parallel != null ? text().bolivianos(formatSigned(parallel - official)) : "";
+  byId("gap-metric").title = text().gapNote;
+  [["official-link", OFFICIAL_SOURCE], ["parallel-link", PARALLEL_SOURCE]].forEach(([id, name]) => {
+    if (pages[name]) { byId(id).href = pages[name]; byId(id).title = text().viewSource; }
+  });
+  const dataLink = byId("data-link");
+  dataLink.hidden = !DATA.dataUrl;
+  if (DATA.dataUrl) dataLink.href = DATA.dataUrl;
   byId("footer-text").textContent = text().footer;
   const contactLink = byId("contact-link");
   contactLink.hidden = !DATA.contactEmail;
@@ -375,13 +441,22 @@ function renderStaticText() {
   if (DATA.subscribeUrl) { subscribeLink.href = DATA.subscribeUrl; subscribeLink.textContent = text().subscribe; }
 }
 
+// "▲ 0,10 vs. ayer": how a figure moved since the last reading of the day before.
+function sinceYesterday(now, before) {
+  if (now == null || before == null) return "";
+  const delta = +(now - before).toFixed(4);
+  return delta ? text().sinceYesterday(`${delta > 0 ? "▲" : "▼"} ${formatNumber(Math.abs(delta))}`) : text().sameAsYesterday;
+}
+
 // Best deal today: the lowest sell for buyers, the highest buy for sellers.
 function renderFacts() {
-  const deal = (label, winners, detail) => `<div><dt>${label}</dt>
-    <dd><span class="winner">${escapeHtml(winners || "—")}</span><span class="who">${detail}</span></dd></div>`;
+  const deal = (label, winners, detail, change) => `<div><dt>${label}</dt>
+    <dd><span class="winner">${escapeHtml(winners || "—")}</span><span class="who">${detail}</span><span class="change">${change}</span></dd></div>`;
   byId("facts").innerHTML =
-    deal(text().toBuy, namesWith(withSell, "sell", minSell), text().toBuyDetail(formatNumber(minSell))) +
-    deal(text().toSell, namesWith(withBuy, "buy", maxBuy), text().toSellDetail(formatNumber(maxBuy))) +
+    deal(text().toBuy, namesWith(withSell, "sell", minSell), text().toBuyDetail(formatNumber(minSell)),
+      sinceYesterday(withSell.length ? minSell : null, bestOf(yesterday, "sell", Math.min))) +
+    deal(text().toSell, namesWith(withBuy, "buy", maxBuy), text().toSellDetail(formatNumber(maxBuy)),
+      sinceYesterday(withBuy.length ? maxBuy : null, bestOf(yesterday, "buy", Math.max))) +
     `<div><dt>${text().averageGap}</dt>
     <dd><span class="num">${formatNumber(averageGap)}</span><span class="who">${text().acrossBanks(gaps.length)}</span></dd></div>`;
 }
@@ -401,7 +476,9 @@ function renderBoard() {
   </div>`;
   byId("board").innerHTML = header + rows.map((r, i) => `
   <div class="row" tabindex="0" data-index="${i}">
-    <span class="bank">${escapeHtml(r.name)}</span>
+    <span class="bank">${pages[r.name]
+      ? `<a href="${escapeHtml(pages[r.name])}" target="_blank" rel="noopener" title="${text().viewSource}">${escapeHtml(r.name)}</a>`
+      : escapeHtml(r.name)}</span>
     <span class="num">${formatNumber(r.buy)}${changeHtml(r, "buy")}</span>
     <div class="track">${gridLines}
       ${official != null ? `<i class="official-mark" style="left:${percent(official)}"></i>` : ""}
@@ -497,11 +574,11 @@ function yDomain(values) {
   return { min: Math.floor((low - 0.02) / step) * step, max: Math.ceil((high + 0.02) / step) * step, step };
 }
 
-function yGridSvg(domain, y, left, right) {
+function yGridSvg(domain, y, left, right, format = v => formatNumber(v)) {
   let svg = "";
   for (let v = domain.min; v <= domain.max + 1e-9; v += domain.step) {
     svg += `<line x1="${left}" x2="${right}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>
-      <text x="${left - 8}" y="${y(v) + 4}" text-anchor="end">${formatNumber(v)}</text>`;
+      <text x="${left - 8}" y="${y(v) + 4}" text-anchor="end">${format(v)}</text>`;
   }
   return svg;
 }
@@ -545,6 +622,22 @@ function drawCandles(points, weekly) {
   svg.addEventListener("mouseleave", () => { crosshair.setAttribute("visibility", "hidden"); hideTooltip(); });
 }
 
+// Labels the first and last readings, and those in between that fit without overlapping.
+function timeLabelsSvg(points, x, baseline) {
+  const lastMs = points[points.length - 1].ms;
+  const spansFewDays = lastMs - points[0].ms < 3 * 24 * 3600 * 1000; // then the time of day matters
+  const labelGap = spansFewDays ? 130 : 90;
+  let svg = "", previousLabelX = -Infinity;
+  points.forEach((p, i) => {
+    const isFirst = i === 0, isLast = i === points.length - 1, labelX = x(p.ms);
+    if (!isFirst && !isLast && (labelX - previousLabelX < labelGap || x(lastMs) - labelX < labelGap)) return;
+    const anchor = isFirst ? "start" : isLast ? "end" : "middle";
+    svg += `<text x="${labelX}" y="${baseline}" text-anchor="${anchor}">${spansFewDays ? formatShortDateTime(p.t) : formatShortDate(p.t)}</text>`;
+    previousLabelX = labelX;
+  });
+  return svg;
+}
+
 function drawLines(points) {
   const values = points.flatMap(p => [p.buy, p.sell, p.official, p.parallel]).filter(v => v != null);
   if (!values.length) { historyPanel.innerHTML = `<p class="empty">${text().noBankData}</p>`; return; }
@@ -556,17 +649,7 @@ function drawLines(points) {
   const y = v => margin.top + (domain.max - v) / (domain.max - domain.min || 1) * (height - margin.top - margin.bottom);
   const path = key => points.filter(p => p[key] != null).map((p, i) => `${i ? "L" : "M"}${x(p.ms).toFixed(1)},${y(p[key]).toFixed(1)}`).join("");
   let marks = yGridSvg(domain, y, margin.left, width - margin.right);
-  const spansFewDays = lastMs - firstMs < 3 * 24 * 3600 * 1000; // then the time of day matters
-  // label the first and last readings, and those in between that fit without overlapping
-  const labelGap = spansFewDays ? 130 : 90;
-  let previousLabelX = -Infinity;
-  points.forEach((p, i) => {
-    const isFirst = i === 0, isLast = i === points.length - 1, labelX = x(p.ms);
-    if (!isFirst && !isLast && (labelX - previousLabelX < labelGap || x(lastMs) - labelX < labelGap)) return;
-    const anchor = isFirst ? "start" : isLast ? "end" : "middle";
-    marks += `<text x="${labelX}" y="${height - 8}" text-anchor="${anchor}">${spansFewDays ? formatShortDateTime(p.t) : formatShortDate(p.t)}</text>`;
-    previousLabelX = labelX;
-  });
+  marks += timeLabelsSvg(points, x, height - 8);
   const lastWith = key => [...points].reverse().find(p => p[key] != null);
   const series = [["sell", text().sell, "var(--sell)"], ["buy", text().buy, "var(--buy)"]]
     .map(([key, name, color]) => ({ key, name, color, point: lastWith(key) })).filter(s => s.point);
@@ -601,8 +684,44 @@ function drawLines(points) {
   svg.addEventListener("mouseleave", () => { crosshair.setAttribute("visibility", "hidden"); hideTooltip(); });
 }
 
+// One line: the gap between the parallel and the official rate at every reading.
+function drawGap() {
+  const points = readings.map(r => ({ t: r.t, ms: Date.parse(r.t), gap: gapOf(r), official: officialOf(r), parallel: parallelOf(r) }))
+    .filter(p => p.gap != null);
+  if (points.length < 2) { historyPanel.innerHTML = `<p class="empty">${text().noGapData}</p>`; return; }
+  const width = chartWidth(), height = CHART_HEIGHT;
+  const margin = { top: 16, right: 70, bottom: 28, left: 60 };
+  const domain = yDomain(points.map(p => p.gap));
+  const percent = v => formatPercent(v, domain.step < 0.1 ? 2 : 1); // a fine grid needs the extra digit
+  const firstMs = points[0].ms, last = points[points.length - 1];
+  const x = ms => margin.left + (ms - firstMs) / (last.ms - firstMs || 1) * (width - margin.left - margin.right);
+  const y = v => margin.top + (domain.max - v) / (domain.max - domain.min || 1) * (height - margin.top - margin.bottom);
+  const line = points.map((p, i) => `${i ? "L" : "M"}${x(p.ms).toFixed(1)},${y(p.gap).toFixed(1)}`).join("");
+  historyPanel.innerHTML = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"
+      aria-label="${text().gapAria}">${yGridSvg(domain, y, margin.left, width - margin.right, percent)}${timeLabelsSvg(points, x, height - 8)}
+    <path d="${line}" fill="none" stroke="var(--parallel)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${x(last.ms)}" cy="${y(last.gap)}" r="4.5" fill="var(--parallel)" stroke="var(--surface)" stroke-width="2"/>
+    <text class="end-value" x="${width - margin.right + 10}" y="${y(last.gap) + 4}" style="fill:var(--parallel)">${percent(last.gap)}</text>
+    <line id="crosshair" y1="${margin.top}" y2="${height - margin.bottom}" stroke="var(--axis)" stroke-width="1" visibility="hidden"/>
+  </svg>
+  <p class="note">${text().gapNote}</p>`;
+  const svg = historyPanel.querySelector("svg"), crosshair = historyPanel.querySelector("#crosshair");
+  svg.addEventListener("mousemove", e => {
+    const box = svg.getBoundingClientRect(), mouseX = (e.clientX - box.left) * (width / box.width);
+    const p = points.reduce((a, b) => Math.abs(x(b.ms) - mouseX) < Math.abs(x(a.ms) - mouseX) ? b : a);
+    crosshair.setAttribute("x1", x(p.ms)); crosshair.setAttribute("x2", x(p.ms)); crosshair.setAttribute("visibility", "visible");
+    const panel = historyPanel.getBoundingClientRect();
+    showTooltip(historyPanel, `<b>${formatShortDateTime(p.t)}</b>${text().gapLabel} ${percent(p.gap)}<br>${text().official} ${formatNumber(p.official)}<br>${text().parallelLabel} ${formatNumber(p.parallel)}`,
+      e.clientX - panel.left, e.clientY - panel.top);
+  });
+  svg.addEventListener("mouseleave", () => { crosshair.setAttribute("visibility", "hidden"); hideTooltip(); });
+}
+
 function drawHistory() {
+  const gapView = viewSelect.value === "gap"; // the gap is not about any one bank
+  bankSelect.hidden = gapView; byId("bank-label").hidden = gapView;
   if (readings.length < 2) { historyPanel.innerHTML = `<p class="empty">${text().oneReading}</p>`; return; }
+  if (gapView) { drawGap(); return; }
   const points = seriesFor(bankSelect.value);
   if (viewSelect.value === "lines") drawLines(points);
   else drawCandles(points, viewSelect.value === "week");
@@ -618,7 +737,7 @@ function render() {
 }
 
 const storedView = readStored("view");
-if (["lines", "day", "week"].includes(storedView)) viewSelect.value = storedView;
+if (["lines", "day", "week", "gap"].includes(storedView)) viewSelect.value = storedView;
 
 byId("lang-toggle").addEventListener("click", e => {
   const button = e.target.closest("button[data-lang]");
