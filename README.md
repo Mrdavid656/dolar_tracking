@@ -89,6 +89,11 @@ One-time setup:
 5. Store the form's normal link in the variable `SUBSCRIBE_URL`; the dashboard then shows
    a link to it.
 
+The form only ever appends rows. To keep the sheet short, paste `scripts/clean_subscribers.gs`
+into the sheet (*Extensions → Apps Script*) and run `installTrigger` once: every day it deletes
+the answers an address has superseded and the unsubscriptions older than three days. This
+never changes who receives the email.
+
 Addresses listed in `MAIL_TO` always receive the email, whatever the form says. Nothing
 verifies that the person filling in the form owns the address, so anyone could subscribe
 or unsubscribe someone else; to prevent that, turn on *Collect email addresses → Verified*
