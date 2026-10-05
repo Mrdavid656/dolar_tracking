@@ -1,12 +1,13 @@
-# Registers a Windows scheduled task that backfills, from this computer, the sources
-# GitHub's servers cannot reach. It only acts when the latest reading lacks a source.
+# Registers a Windows scheduled task that backs up GitHub's scheduler from this
+# computer: it takes the reading when GitHub has not, and fills in the sources
+# GitHub's servers cannot reach.
 #
 # Usage (from PowerShell):  .\scripts\register_backfill_task.ps1
 # To remove it:             Unregister-ScheduledTask -TaskName DolarTrackingBackfill
 #
 # The task works in its own clone of the repository so it never touches a working
-# copy you are editing. Readings are taken at 07:00, 13:00 and 19:00 Bolivia time;
-# the task starts 20 minutes later and retries every 20 minutes for 100 minutes,
+# copy you are editing. Readings are taken at 07:07, 13:07 and 19:07 Bolivia time;
+# the task starts at 20 past and retries every 20 minutes for 100 minutes,
 # because GitHub's scheduler can run late. This computer's clock must be on Bolivia time.
 
 param(

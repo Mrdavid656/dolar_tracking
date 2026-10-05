@@ -3,9 +3,8 @@
 from datetime import datetime, timedelta, timezone
 
 from dolar_market import dashboard, mailer
-from dolar_market.backfill import is_recent
 from dolar_market.models import Quote, Reading, Row
-from dolar_market.scrape import BOLIVIA, Result, problem, query, report_line, to_rows
+from dolar_market.scrape import BOLIVIA, Result, is_recent, problem, query, report_line, to_rows
 from dolar_market.storage import append_rows, group_readings, read_readings, to_record, to_row
 
 ROWS = (
@@ -73,13 +72,14 @@ def test_to_rows_skips_failures():
     assert to_rows("t", results) == (Row("t", "Alpha", Quote(sell=12.0)),)
 
 
-# --- backfill ---
+# --- backfill and backup readings ---
 
 
 def test_is_recent():
     now = datetime(2026, 10, 5, 9, 0, tzinfo=BOLIVIA)
-    assert is_recent(Reading("2026-10-05T07:00:00-04:00", {}), now)
-    assert not is_recent(Reading("2026-10-05T07:00:00-04:00", {}), now + timedelta(hours=2))
+    reading = Reading("2026-10-05T07:00:00-04:00", {})
+    assert is_recent(reading, now, timedelta(hours=3))
+    assert not is_recent(reading, now + timedelta(hours=2), timedelta(hours=3))
 
 
 # --- mailer ---

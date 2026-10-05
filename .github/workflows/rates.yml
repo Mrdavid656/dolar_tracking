@@ -39,9 +39,11 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
+      # A scheduled run that arrives late skips the reading when the backup
+      # computer has already taken it (see scripts/backfill.ps1).
       - name: Query banks
         if: github.event_name != 'push'
-        run: python -m dolar_market.scrape
+        run: python -m dolar_market.scrape ${{ github.event_name == 'schedule' && '--if-older-than 120' || '' }}
 
       - name: Save dataset
         if: github.event_name != 'push'

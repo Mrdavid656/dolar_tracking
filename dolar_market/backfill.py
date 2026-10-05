@@ -12,16 +12,11 @@ import sys
 from datetime import datetime, timedelta
 
 from .analysis import missing_sources
-from .models import Reading
-from .scrape import BOLIVIA, query_all, report_line, to_rows
+from .scrape import BOLIVIA, is_recent, query_all, report_line, to_rows
 from .sources import SOURCES
 from .storage import append_rows, read_readings
 
 MAX_AGE = timedelta(hours=3)  # older than this, a fresh quote no longer describes that reading
-
-
-def is_recent(reading: Reading, now: datetime, max_age: timedelta = MAX_AGE) -> bool:
-    return now - datetime.fromisoformat(reading.timestamp) <= max_age
 
 
 def main() -> int:
@@ -30,7 +25,7 @@ def main() -> int:
     if not missing:
         print(f"Reading {latest.timestamp} is complete; nothing to backfill.")
         return 0
-    if not is_recent(latest, datetime.now(BOLIVIA)):
+    if not is_recent(latest, datetime.now(BOLIVIA), MAX_AGE):
         print(f"Reading {latest.timestamp} is older than {MAX_AGE}; not backfilling {', '.join(missing)}.")
         return 0
     results = query_all({name: SOURCES[name] for name in missing})
