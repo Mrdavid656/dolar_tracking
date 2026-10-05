@@ -125,7 +125,7 @@ footer a { color: var(--accent); }
 footer p + p { margin-top: 6px; }
 [hidden] { display: none !important; }
 
-/* Phones: figures on one line, the chart on its own line at full width. */
+/* Phones: the bank's name on one line; below it, buy and sell at either end of the chart. */
 @media (max-width: 600px) {
   header { flex-direction: column; align-items: stretch; position: relative; }
   header > :first-child { flex: none; }
@@ -135,9 +135,8 @@ footer p + p { margin-top: 6px; }
   .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
   .metric { text-align: left; }
   .metric .num { font-size: clamp(22px, 7vw, 34px); }
-  .row { grid-template-columns: minmax(0, 1fr) 4rem 4rem; row-gap: 6px; }
-  .row > .track { grid-column: 1 / -1; grid-row: 2; }
-  .row .num + .track + .num { text-align: right; }
+  .row { grid-template-columns: 3.4rem minmax(0, 1fr) 3.4rem; row-gap: 4px; }
+  .row > :first-child { grid-column: 1 / -1; }
   .controls { display: grid; grid-template-columns: auto minmax(0, 1fr); width: 100%; }
   .controls select { width: 100%; }
 }
