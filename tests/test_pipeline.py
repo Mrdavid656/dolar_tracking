@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta, timezone
 
-from dolar_market import dashboard, mailer
+from dolar_market import backfill, dashboard, mailer
 from dolar_market.models import Quote, Reading, Row
 from dolar_market.scrape import BOLIVIA, Result, is_recent, problem, query, report_line, to_rows
 from dolar_market.sources import Source
@@ -81,6 +81,11 @@ def test_is_recent():
     reading = Reading("2026-10-05T07:00:00-04:00", {})
     assert is_recent(reading, now, timedelta(hours=3))
     assert not is_recent(reading, now + timedelta(hours=2), timedelta(hours=3))
+
+
+def test_backfill_asks_for_a_retry_while_sources_are_missing():
+    assert backfill.exit_status(("Alpha", "Beta"), ROWS[1:]) == 0
+    assert backfill.exit_status(("Alpha", "Beta"), ROWS[:1]) == backfill.INCOMPLETE
 
 
 # --- mailer ---

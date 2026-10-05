@@ -7,8 +7,9 @@
 #
 # The task works in its own clone of the repository so it never touches a working
 # copy you are editing. Readings are taken at 07:07, 13:07 and 19:07 Bolivia time;
-# the task starts at 20 past and retries every 20 minutes for 100 minutes,
-# because GitHub's scheduler can run late. This computer's clock must be on Bolivia time.
+# the task starts once at 20 past, and backfill.ps1 itself retries every 20 minutes
+# for 100 minutes while the reading is incomplete. This computer's clock must be on
+# Bolivia time.
 
 param(
     [string]$RepositoryUrl = "https://github.com/Mrdavid656/dolar_tracking.git",
@@ -25,17 +26,10 @@ $script = Join-Path $Directory "scripts\backfill.ps1"
 $action = New-ScheduledTaskAction -Execute "powershell.exe" `
     -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`""
 
-$repetition = (New-ScheduledTaskTrigger -Once -At "00:00" `
-    -RepetitionInterval (New-TimeSpan -Minutes 20) `
-    -RepetitionDuration (New-TimeSpan -Minutes 100)).Repetition
-$triggers = "07:20", "13:20", "19:20" | ForEach-Object {
-    $trigger = New-ScheduledTaskTrigger -Daily -At $_
-    $trigger.Repetition = $repetition
-    $trigger
-}
+$triggers = "07:20", "13:20", "19:20" | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }
 
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RunOnlyIfNetworkAvailable `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+    -ExecutionTimeLimit (New-TimeSpan -Hours 2)  # room for every retry
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers -Settings $settings `
     -Description "Backfills dollar rates that GitHub's servers cannot reach." -Force | Out-Null
