@@ -106,7 +106,8 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #history text.end-label { font-family: var(--body); font-size: 12px; fill: var(--ink-2); }
 .note { color: var(--ink-2); font-size: 13px; margin: 8px 0 0; max-width: 70ch; }
 .empty { color: var(--ink-2); margin: 0; padding: 28px 0 20px; max-width: 60ch; }
-footer a { color: var(--accent); }
+.subscribe { display: inline-block; margin-top: 14px; padding: 7px 14px; border: 1px solid var(--accent); border-radius: 4px; color: var(--accent); font-size: 14px; font-weight: 600; text-decoration: none; }
+.subscribe:hover, .subscribe:focus-visible { background: var(--accent); color: var(--bg); outline: none; }
 footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid); padding-top: 14px; max-width: 70ch; }
 </style>
 
@@ -115,6 +116,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid)
     <div>
       <h1 data-i18n="title"></h1>
       <p class="subtitle" id="subtitle"></p>
+      <a class="subscribe" id="subscribe-link" target="_blank" rel="noopener" hidden></a>
     </div>
     <div class="header-side">
       <div class="lang" role="group" id="lang-toggle">
@@ -169,7 +171,7 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid)
     <div class="panel" id="history"></div>
   </section>
 
-  <footer><span id="footer-text"></span> <a id="subscribe-link" target="_blank" rel="noopener" hidden></a></footer>
+  <footer id="footer-text"></footer>
 </div>
 
 <script>

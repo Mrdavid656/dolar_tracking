@@ -6,7 +6,7 @@ dashboard; once a day it emails a summary to every subscriber.
 
 - Dashboard: https://mrdavid656.github.io/dolar_tracking/
 - Readings: 07:00, 13:00 and 19:00 Bolivia time
-- Email: 08:00 Bolivia time
+- Email: 08:00 Bolivia time. [Subscribe or unsubscribe](https://docs.google.com/forms/d/e/1FAIpQLScOe99KN0www_aZeMoC_0ybw3MhPYlrhZhig9BZoGAecjbihg/viewform)
 
 ## Conventions
 
