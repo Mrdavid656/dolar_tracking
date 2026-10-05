@@ -4,7 +4,7 @@ name: Daily email
 
 on:
   schedule:
-    - cron: "0 12 * * *" # 08:00 Bolivia time (UTC-4)
+    - cron: "7 12 * * *" # 08:07 Bolivia time (UTC-4)
   workflow_dispatch:
     inputs:
       check_only:

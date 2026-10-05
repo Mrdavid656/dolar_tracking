@@ -6,9 +6,10 @@ name: Rates
 
 on:
   schedule:
-    - cron: "0 11 * * *" # 07:00 Bolivia time (UTC-4)
-    - cron: "0 17 * * *" # 13:00 Bolivia time
-    - cron: "0 23 * * *" # 19:00 Bolivia time
+    # A few minutes past the hour: GitHub delays or drops runs scheduled at :00.
+    - cron: "7 11 * * *" # 07:07 Bolivia time (UTC-4)
+    - cron: "7 17 * * *" # 13:07 Bolivia time
+    - cron: "7 23 * * *" # 19:07 Bolivia time
   workflow_dispatch:
   push:
     branches: [main]
