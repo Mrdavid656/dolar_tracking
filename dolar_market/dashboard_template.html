@@ -553,12 +553,16 @@ function drawLines(points) {
   const path = key => points.filter(p => p[key] != null).map((p, i) => `${i ? "L" : "M"}${x(p.ms).toFixed(1)},${y(p[key]).toFixed(1)}`).join("");
   let marks = yGridSvg(domain, y, margin.left, width - margin.right);
   const spansFewDays = lastMs - firstMs < 3 * 24 * 3600 * 1000; // then the time of day matters
-  const labelCount = Math.min(points.length, Math.max(2, Math.floor((width - margin.left - margin.right) / (spansFewDays ? 130 : 90))));
-  for (let i = 0; i < labelCount; i++) {
-    const p = points[Math.round(i * (points.length - 1) / (labelCount - 1))];
-    const anchor = i === 0 ? "start" : i === labelCount - 1 ? "end" : "middle";
-    marks += `<text x="${x(p.ms)}" y="${height - 8}" text-anchor="${anchor}">${spansFewDays ? formatShortDateTime(p.t) : formatShortDate(p.t)}</text>`;
-  }
+  // label the first and last readings, and those in between that fit without overlapping
+  const labelGap = spansFewDays ? 130 : 90;
+  let previousLabelX = -Infinity;
+  points.forEach((p, i) => {
+    const isFirst = i === 0, isLast = i === points.length - 1, labelX = x(p.ms);
+    if (!isFirst && !isLast && (labelX - previousLabelX < labelGap || x(lastMs) - labelX < labelGap)) return;
+    const anchor = isFirst ? "start" : isLast ? "end" : "middle";
+    marks += `<text x="${labelX}" y="${height - 8}" text-anchor="${anchor}">${spansFewDays ? formatShortDateTime(p.t) : formatShortDate(p.t)}</text>`;
+    previousLabelX = labelX;
+  });
   const lastWith = key => [...points].reverse().find(p => p[key] != null);
   const series = [["sell", text().sell, "var(--sell)"], ["buy", text().buy, "var(--buy)"]]
     .map(([key, name, color]) => ({ key, name, color, point: lastWith(key) })).filter(s => s.point);
