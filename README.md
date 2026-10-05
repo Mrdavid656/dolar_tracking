@@ -91,7 +91,8 @@ One-time setup:
 
 The form only ever appends rows. To keep the sheet short, paste `scripts/clean_subscribers.gs`
 into the sheet (*Extensions → Apps Script*) and run `installTrigger` once: every day it deletes
-the answers an address has superseded and the unsubscriptions older than three days. This
+the unsubscriptions and superseded answers of every address that last answered three or more
+days ago. This
 never changes who receives the email.
 
 Addresses listed in `MAIL_TO` always receive the email, whatever the form says. Nothing

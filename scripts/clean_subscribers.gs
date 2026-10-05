@@ -2,19 +2,19 @@
  * Keeps the subscribers sheet short. Google Apps Script, bound to the spreadsheet
  * that receives the sign-up form's responses.
  *
- * Once a day it deletes:
- *   - every row an address has superseded with a newer answer (only the latest
- *     answer of each address decides its subscription, so older ones are noise);
- *   - the latest answer itself when it is an unsubscription older than
- *     KEEP_UNSUBSCRIBED_DAYS days.
+ * Only the latest answer of each address decides its subscription. Once a day,
+ * for every address whose latest answer is at least KEEP_DAYS days old, it deletes:
+ *   - the older answers that the latest one superseded;
+ *   - the latest answer too, when it is an unsubscription.
  *
- * Deleting these rows never changes who receives the email.
+ * Nothing is touched during the KEEP_DAYS after an address's last answer, and
+ * deleting these rows never changes who receives the email.
  *
  * Setup: in the spreadsheet open Extensions > Apps Script, paste this file, save,
  * then run `installTrigger` once and accept the permission prompt.
  */
 
-const KEEP_UNSUBSCRIBED_DAYS = 3;
+const KEEP_DAYS = 3;
 // Must match UNSUBSCRIBE_WORDS in dolar_market/mailer.py.
 const UNSUBSCRIBE_WORDS = ["unsubscribe", "cancel", "baja", "darme de baja", "desuscri", "dejar de"];
 const EMAIL_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/;
@@ -33,7 +33,7 @@ function isUnsubscribe(row) {
 
 /** Row numbers (1-based) to delete, given the sheet's values and the current time. */
 function rowsToDelete(values, now) {
-  const cutoff = now - KEEP_UNSUBSCRIBED_DAYS * 24 * 60 * 60 * 1000;
+  const cutoff = now - KEEP_DAYS * 24 * 60 * 60 * 1000;
   const latestRowOf = {};
   values.forEach((row, index) => {
     const address = index > 0 && addressIn(row);
@@ -43,10 +43,11 @@ function rowsToDelete(values, now) {
     .map((row, index) => {
       const address = index > 0 && addressIn(row);
       if (!address) return null; // header and rows without an address are left alone
+      const latest = values[latestRowOf[address]];
+      const lastAnswered = latest[0] instanceof Date ? latest[0].getTime() : NaN;
+      if (!(lastAnswered < cutoff)) return null; // answered recently: keep everything
       const superseded = latestRowOf[address] !== index;
-      const submitted = row[0] instanceof Date ? row[0].getTime() : NaN;
-      const expired = isUnsubscribe(row) && submitted < cutoff;
-      return superseded || expired ? index + 1 : null;
+      return superseded || isUnsubscribe(row) ? index + 1 : null;
     })
     .filter(rowNumber => rowNumber !== null);
 }
