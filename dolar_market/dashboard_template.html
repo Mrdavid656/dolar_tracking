@@ -74,6 +74,9 @@ section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .key.buy { background: var(--buy); } .key.sell { background: var(--sell); }
 .key.official-line { width: 2px; height: 14px; border-radius: 0; background: var(--accent); }
 .key.parallel-line { width: 0; height: 14px; border-radius: 0; border-left: 2px dashed var(--parallel); }
+.key.line { width: 16px; height: 2px; border-radius: 1px; }
+.key.line.official { background: var(--accent); }
+.key.line.parallel { height: 0; border-top: 2px dashed var(--parallel); }
 
 .panel { background: var(--surface); border: 1px solid var(--grid); border-radius: 6px; padding: 8px 16px 14px; position: relative; }
 .row { display: grid; grid-template-columns: minmax(84px, 11rem) 3.4rem minmax(70px, 1fr) 3.4rem; align-items: center; column-gap: 12px; padding: 9px 0; border-top: 1px solid var(--grid); }
@@ -104,7 +107,7 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 #history { min-height: 120px; }
 #history svg { display: block; width: 100%; height: auto; }
 #history text { font-family: var(--mono); font-size: 11px; fill: var(--muted); }
-#history text.end-label { font-family: var(--body); font-size: 12px; fill: var(--ink-2); }
+#history .legend { padding: 6px 0 2px; }
 .note { color: var(--ink-2); font-size: 13px; margin: 10px 0 0; text-align: center; text-wrap: balance; }
 .empty { color: var(--ink-2); margin: 0; padding: 36px 0 28px; text-align: center; text-wrap: balance; }
 .subscribe { display: inline-block; margin-top: 14px; padding: 7px 14px; border: 1px solid var(--accent); border-radius: 4px; color: var(--accent); font-size: 14px; font-weight: 600; text-decoration: none; }
@@ -545,7 +548,7 @@ function drawLines(points) {
   const values = points.flatMap(p => [p.buy, p.sell, p.official, p.parallel]).filter(v => v != null);
   if (!values.length) { historyPanel.innerHTML = `<p class="empty">${text().noBankData}</p>`; return; }
   const width = chartWidth(), height = CHART_HEIGHT;
-  const margin = { top: 16, right: 96, bottom: 28, left: 44 };
+  const margin = { top: 16, right: 16, bottom: 28, left: 44 };
   const domain = yDomain(values);
   const firstMs = points[0].ms, lastMs = points[points.length - 1].ms;
   const x = ms => margin.left + (ms - firstMs) / (lastMs - firstMs || 1) * (width - margin.left - margin.right);
@@ -566,20 +569,15 @@ function drawLines(points) {
   const lastWith = key => [...points].reverse().find(p => p[key] != null);
   const series = [["sell", text().sell, "var(--sell)"], ["buy", text().buy, "var(--buy)"]]
     .map(([key, name, color]) => ({ key, name, color, point: lastWith(key) })).filter(s => s.point);
-  // nudge the end labels apart when they would overlap
-  series.forEach(s => { s.labelY = y(s.point[s.key]); });
-  if (series.length === 2 && Math.abs(series[0].labelY - series[1].labelY) < 14) {
-    const middle = (series[0].labelY + series[1].labelY) / 2;
-    const upper = series[0].labelY <= series[1].labelY ? 0 : 1;
-    series[upper].labelY = middle - 7; series[1 - upper].labelY = middle + 7;
-  }
-  historyPanel.innerHTML = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"
+  const legend = [...series.map(s => [s.key, s.name]), ["official", text().officialLabel], ["parallel", text().parallelLabel]]
+    .filter(([key]) => points.some(p => p[key] != null))
+    .map(([key, name]) => `<span><i class="key line ${key}"></i>${name}</span>`).join("");
+  historyPanel.innerHTML = `<div class="legend">${legend}</div><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"
       aria-label="${text().linesAria}">${marks}
     <path d="${path("official")}" fill="none" stroke="var(--accent)" stroke-width="1.5" opacity="0.7"/>
     <path d="${path("parallel")}" fill="none" stroke="var(--parallel)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.9"/>
     ${series.map(s => `<path d="${path(s.key)}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-      <circle cx="${x(s.point.ms)}" cy="${y(s.point[s.key])}" r="4.5" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>
-      <text class="end-label" x="${width - margin.right + 10}" y="${s.labelY + 4}">${s.name} ${formatNumber(s.point[s.key])}</text>`).join("")}
+      <circle cx="${x(s.point.ms)}" cy="${y(s.point[s.key])}" r="4.5" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`).join("")}
     <line id="crosshair" y1="${margin.top}" y2="${height - margin.bottom}" stroke="var(--axis)" stroke-width="1" visibility="hidden"/>
   </svg>`;
   const svg = historyPanel.querySelector("svg"), crosshair = historyPanel.querySelector("#crosshair");
