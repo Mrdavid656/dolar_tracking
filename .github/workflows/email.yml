@@ -11,6 +11,10 @@ on:
         description: Only report who would receive the email; send nothing
         type: boolean
         default: false
+      only_to:
+        description: Send only to this address, ignoring the subscribers (for testing)
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -33,6 +37,7 @@ jobs:
           MAIL_TO: ${{ secrets.MAIL_TO }}
           SUBSCRIBERS_URL: ${{ secrets.SUBSCRIBERS_URL }}
           UNSUBSCRIBE_URL: ${{ vars.UNSUBSCRIBE_URL }}
+          MAIL_ONLY_TO: ${{ inputs.only_to }}
           MAIL_LANG: ${{ vars.MAIL_LANG }}
         run: |
           export DASHBOARD_URL="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/"

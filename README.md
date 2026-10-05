@@ -64,6 +64,9 @@ Settings, under *Settings → Secrets and variables → Actions*:
 | `MAIL_LANG` | variable, optional | email language, `es` (default) or `en` |
 | `SUBSCRIBE_URL` | variable, optional | sign-up form linked from the dashboard |
 
+To try the email without reaching the subscribers, run the *Daily email* workflow by hand
+with `only_to` set to your address, or with `check_only` ticked to send nothing at all.
+
 ### Subscribers
 
 People subscribe and unsubscribe on their own through one Google Form; nobody maintains

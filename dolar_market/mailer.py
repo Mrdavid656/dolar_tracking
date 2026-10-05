@@ -12,6 +12,8 @@ Environment variables:
                      (a Google Sheet published to the web)
     UNSUBSCRIBE_URL  optional; link to the same form pre-filled to unsubscribe,
                      with "{email}" where the recipient's address goes
+    MAIL_ONLY_TO     optional; send only to these addresses, ignoring the
+                     subscribers (for trying the email out)
     MAIL_LANG        optional; "es" or "en" (defaults to "es")
     DASHBOARD_URL    optional; adds a button linking to the live dashboard
 
@@ -529,9 +531,10 @@ def main() -> None:
         print(email.subject)
         return
     user = env["GMAIL_USER"]
-    sheet = fetch_sheet(env.get("SUBSCRIBERS_URL"))
-    recipients = recipients_for(env.get("MAIL_TO"), sheet) or (user,)
-    print(describe_sheet(sheet))
+    only_to = addresses_in(env.get("MAIL_ONLY_TO"))
+    sheet = "" if only_to else fetch_sheet(env.get("SUBSCRIBERS_URL"))
+    recipients = only_to or recipients_for(env.get("MAIL_TO"), sheet) or (user,)
+    print("Test send: subscribers ignored." if only_to else describe_sheet(sheet))
     if "--check" in sys.argv:
         print(f"{len(recipients)} recipient(s) would receive the email; nothing was sent.")
         return
