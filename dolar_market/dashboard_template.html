@@ -112,6 +112,19 @@ footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--grid)
 footer p { margin: 0; }
 footer a { color: var(--accent); }
 footer p + p { margin-top: 6px; }
+[hidden] { display: none !important; }
+
+/* Phones: figures on one line, the chart on its own line at full width. */
+@media (max-width: 560px) {
+  header { flex-direction: column; align-items: stretch; }
+  .header-side { flex-direction: row-reverse; justify-content: space-between; align-items: flex-end; }
+  .metric { text-align: left; }
+  .row { grid-template-columns: minmax(0, 1fr) 4rem 4rem; row-gap: 6px; }
+  .row > .track { grid-column: 1 / -1; grid-row: 2; }
+  .row .num + .track + .num { text-align: right; }
+  .controls { display: grid; grid-template-columns: auto minmax(0, 1fr); width: 100%; }
+  .controls select { width: 100%; }
+}
 </style>
 
 <div class="wrap">
