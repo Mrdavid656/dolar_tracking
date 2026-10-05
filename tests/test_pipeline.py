@@ -95,19 +95,39 @@ def test_email_names_the_best_deals_in_both_languages():
     assert "▲ 0.10" in english.html  # Alpha's buy rose from 11.4 to 11.5
 
 
-def test_parse_recipients_deduplicates_and_ignores_noise():
-    sheet = "Timestamp,Email\n2026-10-05,Ana@Example.com\n2026-10-06,luis@example.org\n"
-    assert mailer.parse_recipients("ana@example.com, bad-address", sheet, None) == (
-        "ana@example.com",
+SHEET = (
+    "Timestamp,Email,Action\n"
+    "2026-10-05 08:00,Ana@Example.com,Suscribirme\n"
+    "2026-10-05 09:00,luis@example.org,Subscribe\n"
+    "2026-10-06 10:00,ana@example.com,Darme de baja\n"
+    "2026-10-06 11:00,not an address,Subscribe\n"
+    "2026-10-07 12:00,eva@example.com,Unsubscribe\n"
+    "2026-10-08 13:00,eva@example.com,Suscribirme\n"
+)
+
+
+def test_last_form_answer_decides_the_subscription():
+    assert mailer.subscribers_from_sheet(SHEET) == ("luis@example.org", "eva@example.com")
+    assert mailer.subscribers_from_sheet(None) == ()
+
+
+def test_recipients_join_fixed_addresses_and_subscribers_without_repeats():
+    assert mailer.recipients_for("Owner@example.com, luis@example.org", SHEET) == (
+        "owner@example.com",
         "luis@example.org",
+        "eva@example.com",
     )
 
 
-def test_recipients_travel_in_bcc():
-    email = mailer.build(READINGS, ["Alpha"], "en")
-    message = mailer.to_message(email, "me@example.com", ("ana@example.com", "luis@example.org"))
-    assert message["To"] == "me@example.com"
-    assert message["Bcc"] == "ana@example.com, luis@example.org"
+def test_each_message_carries_a_personal_unsubscribe_link():
+    link = mailer.unsubscribe_link("https://forms.example/f?email={email}&do=Unsubscribe", "ana+x@example.com")
+    assert link == "https://forms.example/f?email=ana%2Bx%40example.com&do=Unsubscribe"
+    email = mailer.build(READINGS, ["Alpha"], "en", unsubscribe_url=link)
+    message = mailer.to_message(email, "me@example.com", "ana+x@example.com", link)
+    assert link in email.html and ">Unsubscribe</a>" in email.html
+    assert message["To"] == "ana+x@example.com"
+    assert message["List-Unsubscribe"] == f"<{link}>"
+    assert mailer.unsubscribe_link(None, "ana@example.com") is None
 
 
 # --- dashboard ---

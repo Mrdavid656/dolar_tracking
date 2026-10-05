@@ -6,7 +6,7 @@ dashboard; once a day it emails a summary to every subscriber.
 
 - Dashboard: https://mrdavid656.github.io/dolar_tracking/
 - Readings: 07:00, 13:00 and 19:00 Bolivia time
-- Email: 09:00 Bolivia time
+- Email: 08:00 Bolivia time
 
 ## Conventions
 
@@ -49,7 +49,7 @@ them as reference lines; the parallel rate displayed is the midpoint of its buy 
 | workflow | when | what |
 |---|---|---|
 | `rates.yml` | 07:00, 13:00, 19:00 Bolivia time, and on pushes that change data or code | take a reading, commit it, report failing sources, publish the dashboard to GitHub Pages |
-| `email.yml` | 09:00 Bolivia time | email the latest reading to the subscribers |
+| `email.yml` | 08:00 Bolivia time | email the latest reading to the subscribers |
 | `tests.yml` | pushes and pull requests | run the test suite |
 
 Settings, under *Settings → Secrets and variables → Actions*:
@@ -58,20 +58,41 @@ Settings, under *Settings → Secrets and variables → Actions*:
 |---|---|---|
 | `GMAIL_USER` | secret | Gmail address that sends the email |
 | `GMAIL_APP_PASSWORD` | secret | its app password (https://myaccount.google.com/apppasswords) |
-| `MAIL_TO` | secret, optional | comma-separated recipients |
-| `SUBSCRIBERS_URL` | secret, optional | URL of a text or CSV document listing subscriber addresses |
+| `MAIL_TO` | secret, optional | comma-separated recipients who always get the email |
+| `SUBSCRIBERS_URL` | secret, optional | published CSV with the sign-up form's responses |
+| `UNSUBSCRIBE_URL` | variable, optional | form link pre-filled to unsubscribe, with `{email}` as placeholder |
 | `MAIL_LANG` | variable, optional | email language, `es` (default) or `en` |
 | `SUBSCRIBE_URL` | variable, optional | sign-up form linked from the dashboard |
 
 ### Subscribers
 
-The email goes to every address in `MAIL_TO` plus every address found in the document at
-`SUBSCRIBERS_URL`. All recipients are placed in Bcc, so they never see each other.
+People subscribe and unsubscribe on their own through one Google Form; nobody maintains
+the list by hand. Every morning the workflow reads the form's responses in order and the
+most recent answer of each address decides whether it is subscribed. A new subscriber
+starts receiving the email at the next 08:00. Each recipient gets an individual message
+with a personal "unsubscribe" link that opens the form already filled in.
 
-To let people subscribe on their own, create a Google Form that asks for an email address,
-link it to a Google Sheet and publish that sheet as CSV (*File → Share → Publish to web*).
-Store the published CSV link in `SUBSCRIBERS_URL` and the form link in `SUBSCRIBE_URL`.
-To unsubscribe someone, delete their row from the sheet.
+One-time setup:
+
+1. Create a Google Form with two required questions:
+   - a short-answer question for the email address (turn on response validation: *Text → Email*);
+   - a multiple-choice question with the options `Suscribirme` and `Darme de baja`.
+     An answer starting with "unsubscribe", "cancel", "baja", "darme de baja", "desuscri"
+     or "dejar de" removes the address; anything else subscribes it.
+2. In the *Responses* tab choose *Link to Sheets*.
+3. In that sheet choose *File → Share → Publish to web*, pick the responses tab and the
+   *CSV* format, and publish. Store the resulting link in the secret `SUBSCRIBERS_URL`.
+   Keep it secret: anyone holding that link can read the subscribers' addresses.
+4. In the form choose *⋮ → Get pre-filled link*, type `EMAIL` as the address, select
+   `Darme de baja` and copy the link. Replace `EMAIL` with `{email}` and store the result
+   in the variable `UNSUBSCRIBE_URL`.
+5. Store the form's normal link in the variable `SUBSCRIBE_URL`; the dashboard then shows
+   a link to it.
+
+Addresses listed in `MAIL_TO` always receive the email, whatever the form says. Nothing
+verifies that the person filling in the form owns the address, so anyone could subscribe
+or unsubscribe someone else; to prevent that, turn on *Collect email addresses → Verified*
+in the form's settings, which makes respondents sign in with Google.
 
 ### Failing sources
 

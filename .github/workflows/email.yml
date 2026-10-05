@@ -4,7 +4,7 @@ name: Daily email
 
 on:
   schedule:
-    - cron: "0 13 * * *" # 09:00 Bolivia time (UTC-4)
+    - cron: "0 12 * * *" # 08:00 Bolivia time (UTC-4)
   workflow_dispatch:
 
 permissions:
@@ -27,6 +27,7 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           MAIL_TO: ${{ secrets.MAIL_TO }}
           SUBSCRIBERS_URL: ${{ secrets.SUBSCRIBERS_URL }}
+          UNSUBSCRIBE_URL: ${{ vars.UNSUBSCRIBE_URL }}
           MAIL_LANG: ${{ vars.MAIL_LANG }}
         run: |
           export DASHBOARD_URL="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/"

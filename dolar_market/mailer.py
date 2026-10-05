@@ -6,20 +6,27 @@ Usage:
 
 Environment variables:
     GMAIL_USER, GMAIL_APP_PASSWORD  sender account and its app password
-    MAIL_TO          optional; comma-separated recipients
-    SUBSCRIBERS_URL  optional; URL of a text/CSV document listing subscriber
-                     addresses (for example a published Google Sheet)
+    MAIL_TO          optional; comma-separated recipients who always get it
+    SUBSCRIBERS_URL  optional; URL of the CSV with the sign-up form's responses
+                     (a Google Sheet published to the web)
+    UNSUBSCRIBE_URL  optional; link to the same form pre-filled to unsubscribe,
+                     with "{email}" where the recipient's address goes
     MAIL_LANG        optional; "es" or "en" (defaults to "es")
     DASHBOARD_URL    optional; adds a button linking to the live dashboard
 
-Every recipient is placed in Bcc, so subscribers never see each other. With no
-recipients configured the email goes to GMAIL_USER.
+Subscribing and unsubscribing are both answers to one form. The responses are
+read in order and the last answer of each address decides, so people manage their
+own subscription and the list needs no upkeep. Each recipient gets an individual
+message carrying a personal unsubscribe link. With no recipients configured the
+email goes to GMAIL_USER.
 
 The HTML mirrors the dashboard's dark board. Email clients run no scripts and
 ignore most CSS, so the layout is built from tables with inline styles and the
 chart from table cells sized in percentages.
 """
 
+import csv
+import io
 import math
 import os
 import re
@@ -30,6 +37,7 @@ from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
 from typing import NamedTuple
+from urllib.parse import quote
 
 import requests
 
@@ -50,6 +58,8 @@ from .storage import read_readings
 NO_DATA = Quote()
 DEFAULT_LANG = "es"
 EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+# A form answer starting with one of these means "take me off the list".
+UNSUBSCRIBE_WORDS = ("unsubscribe", "cancel", "baja", "darme de baja", "desuscri", "dejar de")
 
 # The dashboard's dark palette.
 PAGE = "#0d0f0e"
@@ -97,7 +107,8 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         ),
         "missing": "Sin datos en esta lectura: {banks}",
         "open_dashboard": "Ver el tablero completo",
-        "subscribed": "Recibes este correo porque te suscribiste. Para dejar de recibirlo, responde a este mensaje.",
+        "subscribed": "Recibes este correo porque te suscribiste.",
+        "unsubscribe": "Darme de baja",
         "subject": "Dólar Bolivia {date}: venta desde Bs {sell}, compra hasta Bs {buy}",
         "plain": "Tu cliente de correo no muestra HTML.",
     },
@@ -126,7 +137,8 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         ),
         "missing": "No data in this reading: {banks}",
         "open_dashboard": "Open the full dashboard",
-        "subscribed": "You receive this email because you subscribed. To stop receiving it, reply to this message.",
+        "subscribed": "You receive this email because you subscribed.",
+        "unsubscribe": "Unsubscribe",
         "subject": "Bolivia dollar {date}: sell from Bs {sell}, buy up to Bs {buy}",
         "plain": "Your email client does not display HTML.",
     },
@@ -169,10 +181,37 @@ def display_name(source: str, text: Mapping[str, str]) -> str:
     return text["parallel"] if source == PARALLEL_SOURCE else source
 
 
-def parse_recipients(*documents: str | None) -> tuple[str, ...]:
-    """Every distinct email address found in the given texts, in order of appearance."""
-    found = (match.lower() for document in documents if document for match in EMAIL_PATTERN.findall(document))
-    return tuple(dict.fromkeys(found))
+def addresses_in(text: str | None) -> tuple[str, ...]:
+    """Every distinct email address found in a text, lower-cased, in order of appearance."""
+    return tuple(dict.fromkeys(match.lower() for match in EMAIL_PATTERN.findall(text or "")))
+
+
+def is_unsubscribe(cells: Iterable[str]) -> bool:
+    return any(cell.strip().lower().startswith(UNSUBSCRIBE_WORDS) for cell in cells)
+
+
+def subscribers_from_sheet(sheet: str | None) -> tuple[str, ...]:
+    """Addresses whose most recent form answer is a subscription.
+
+    Each row of the responses CSV holds an address and, optionally, the chosen
+    action. Rows come in the order they were submitted, so a later row overrides
+    an earlier one from the same address.
+    """
+    subscribed: dict[str, bool] = {}
+    for cells in csv.reader(io.StringIO(sheet or "")):
+        for address in addresses_in(" ".join(cells))[:1]:
+            subscribed = {**subscribed, address: not is_unsubscribe(cells)}
+    return tuple(address for address, active in subscribed.items() if active)
+
+
+def recipients_for(always: str | None, sheet: str | None) -> tuple[str, ...]:
+    """The fixed recipients followed by the current subscribers, without repeats."""
+    return tuple(dict.fromkeys((*addresses_in(always), *subscribers_from_sheet(sheet))))
+
+
+def unsubscribe_link(template: str | None, recipient: str) -> str | None:
+    """The pre-filled form link for one recipient, or None when none is configured."""
+    return template.replace("{email}", quote(recipient)) if template else None
 
 
 # --- Pure functions: HTML fragments -------------------------------------------------
@@ -340,11 +379,24 @@ def button_html(url: str | None, text: Mapping[str, str]) -> str:
     )
 
 
+def subscription_html(unsubscribe_url: str | None, text: Mapping[str, str]) -> str:
+    link = (
+        f' <a href="{unsubscribe_url}" style="color:{INK_2};text-decoration:underline">{text["unsubscribe"]}</a>'
+        if unsubscribe_url
+        else ""
+    )
+    return (
+        f'<div style="{SANS};font-size:11px;line-height:17px;color:{MUTED};max-width:600px;padding-top:14px">'
+        f'{text["subscribed"]}{link}</div>'
+    )
+
+
 def build(
     readings: Sequence[Reading],
     sources: Iterable[str],
     lang: str = DEFAULT_LANG,
     dashboard_url: str | None = None,
+    unsubscribe_url: str | None = None,
 ) -> Email:
     """Build the email for the latest reading, compared with the previous one."""
     text = TEXTS.get(lang, TEXTS[DEFAULT_LANG])
@@ -402,21 +454,20 @@ def build(
 </td></tr>
 {button_html(dashboard_url, text)}
 </table>
-<div style="{SANS};font-size:11px;line-height:17px;color:{MUTED};max-width:600px;padding-top:14px">{text["subscribed"]}</div>
+{subscription_html(unsubscribe_url, text)}
 </td></tr></table>
 </div>"""
     subject = text["subject"].format(date=date, sell=fmt(cheapest.price, text), buy=fmt(best_paying.price, text))
     return Email(subject, html, text["plain"])
 
 
-def to_message(email: Email, sender: str, recipients: Sequence[str]) -> EmailMessage:
-    """Address the email to the sender and put every recipient in Bcc."""
+def to_message(email: Email, sender: str, recipient: str, unsubscribe_url: str | None = None) -> EmailMessage:
     message = EmailMessage()
     message["Subject"] = email.subject
     message["From"] = sender
-    message["To"] = sender
-    if recipients:
-        message["Bcc"] = ", ".join(recipients)
+    message["To"] = recipient
+    if unsubscribe_url:
+        message["List-Unsubscribe"] = f"<{unsubscribe_url}>"
     message.set_content(email.plain)
     message.add_alternative(email.html, subtype="html")
     return message
@@ -425,32 +476,48 @@ def to_message(email: Email, sender: str, recipients: Sequence[str]) -> EmailMes
 # --- Effects: disk, environment and network --------------------------------------
 
 
-def fetch_subscribers(url: str | None) -> str:
-    """Download the subscriber list, or return nothing when no URL is configured."""
+def fetch_sheet(url: str | None) -> str:
+    """Download the form responses, or return nothing when no URL is configured."""
     if not url:
         return ""
     response = requests.get(url, timeout=30)
     response.raise_for_status()
-    return response.text
+    return response.content.decode("utf-8", errors="replace")
 
 
-def send(message: EmailMessage, user: str, password: str) -> None:
+def send_all(messages: Iterable[EmailMessage], user: str, password: str) -> tuple[int, int]:
+    """Send every message over one connection. Returns (delivered, refused)."""
+    delivered = refused = 0
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
         smtp.login(user, password)
-        smtp.send_message(message)
+        for message in messages:
+            try:
+                smtp.send_message(message)
+                delivered += 1
+            except smtplib.SMTPRecipientsRefused:  # one bad address must not stop the rest
+                refused += 1
+    return delivered, refused
 
 
 def main() -> None:
     env = os.environ
-    email = build(read_readings(), SOURCES, env.get("MAIL_LANG") or DEFAULT_LANG, env.get("DASHBOARD_URL"))
+    readings = read_readings()
+    lang, dashboard_url = env.get("MAIL_LANG") or DEFAULT_LANG, env.get("DASHBOARD_URL")
     if "--preview" in sys.argv:
+        link = unsubscribe_link(env.get("UNSUBSCRIBE_URL"), "reader@example.com")
+        email = build(readings, SOURCES, lang, dashboard_url, link)
         Path("email_preview.html").write_text(email.html, encoding="utf-8")
         print(email.subject)
         return
     user = env["GMAIL_USER"]
-    recipients = parse_recipients(env.get("MAIL_TO"), fetch_subscribers(env.get("SUBSCRIBERS_URL")))
-    send(to_message(email, user, recipients), user, env["GMAIL_APP_PASSWORD"])
-    print(f"Email sent to {len(recipients) or 1} recipient(s)")
+    recipients = recipients_for(env.get("MAIL_TO"), fetch_sheet(env.get("SUBSCRIBERS_URL"))) or (user,)
+    links = tuple(unsubscribe_link(env.get("UNSUBSCRIBE_URL"), recipient) for recipient in recipients)
+    messages = (
+        to_message(build(readings, SOURCES, lang, dashboard_url, link), user, recipient, link)
+        for recipient, link in zip(recipients, links)
+    )
+    delivered, refused = send_all(messages, user, env["GMAIL_APP_PASSWORD"])
+    print(f"Email sent to {delivered} recipient(s); {refused} refused")
 
 
 if __name__ == "__main__":
