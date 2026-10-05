@@ -234,3 +234,4 @@ ignored/
 # Local project notes for Claude Code
 CLAUDE.local.md
 *.local.md
+share/
