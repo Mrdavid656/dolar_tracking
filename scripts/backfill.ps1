@@ -1,6 +1,6 @@
 # Backs up GitHub's scheduler from this computer: takes the reading itself when
 # GitHub has not, and otherwise fills in the sources GitHub's servers could not reach.
-# Meant to be run by the scheduled task created by register_backfill_task.ps1,
+# Meant to be run by the scheduled task created by register_backup_tasks.ps1,
 # inside a clone of the repository that is used for nothing else.
 #
 # The task starts it once per reading. It stops as soon as the reading is complete

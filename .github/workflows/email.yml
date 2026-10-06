@@ -1,6 +1,9 @@
 name: Daily email
 
-# Sends the summary of the latest reading to every subscriber.
+# Sends the summary of the latest reading to every subscriber, once a day.
+# GitHub's scheduler sometimes never starts this run, so a computer may start it
+# too (scripts/email_backup.ps1). A marker kept per day makes whichever run comes
+# second send nothing. Test runs (check_only, only_to) ignore the marker.
 
 on:
   schedule:
@@ -19,6 +22,12 @@ on:
 permissions:
   contents: read
 
+# One at a time, so two runs can never both find the day's marker missing.
+concurrency: email
+
+env:
+  REAL_SEND: ${{ !inputs.check_only && inputs.only_to == '' }}
+
 jobs:
   send:
     runs-on: ubuntu-latest
@@ -30,7 +39,21 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
 
+      - name: Day in Bolivia
+        id: day
+        run: echo "date=$(TZ=America/La_Paz date +%F)" >> "$GITHUB_OUTPUT"
+
+      - name: Look for today's marker
+        id: marker
+        if: env.REAL_SEND == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .email-sent
+          key: email-sent-${{ steps.day.outputs.date }}
+          lookup-only: true
+
       - name: Send email
+        if: steps.marker.outputs.cache-hit != 'true'
         env:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
@@ -45,3 +68,14 @@ jobs:
         run: |
           export DASHBOARD_URL="https://${GITHUB_REPOSITORY_OWNER,,}.github.io/${GITHUB_REPOSITORY#*/}/"
           python -m dolar_market.mailer ${{ inputs.check_only && '--check' || '' }}
+
+      - name: Write today's marker
+        if: env.REAL_SEND == 'true' && steps.marker.outputs.cache-hit != 'true'
+        run: date > .email-sent
+
+      - name: Save today's marker
+        if: env.REAL_SEND == 'true' && steps.marker.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .email-sent
+          key: email-sent-${{ steps.day.outputs.date }}
