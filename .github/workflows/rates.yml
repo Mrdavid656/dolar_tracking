@@ -40,10 +40,14 @@ jobs:
       - run: pip install -r requirements.txt
 
       # A scheduled run that arrives late skips the reading when the backup
-      # computer has already taken it (see scripts/backfill.ps1).
+      # computer has already taken it (see scripts/backfill.ps1), and always
+      # when it arrives over an hour late: GitHub sometimes delivers them many
+      # hours later, between two slots.
       - name: Query banks
         if: github.event_name != 'push'
-        run: python -m dolar_market.scrape ${{ github.event_name == 'schedule' && '--if-older-than 120' || '' }}
+        env:
+          CRON: ${{ github.event.schedule }}
+        run: python -m dolar_market.scrape ${{ github.event_name == 'schedule' && '--if-older-than 120 --scheduled-by "$CRON"' || '' }}
 
       - name: Save dataset
         if: github.event_name != 'push'

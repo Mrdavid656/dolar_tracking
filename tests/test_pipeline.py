@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from dolar_market import backfill, dashboard, mailer
 from dolar_market.models import Quote, Reading, Row
-from dolar_market.scrape import BOLIVIA, Result, is_recent, problem, query, report_line, to_rows
+from dolar_market.scrape import BOLIVIA, MAX_DELAY, Result, delay, is_recent, problem, query, report_line, to_rows
 from dolar_market.sources import Source
 from dolar_market.storage import append_rows, group_readings, read_readings, to_record, to_row
 
@@ -81,6 +81,13 @@ def test_is_recent():
     reading = Reading("2026-10-05T07:00:00-04:00", {})
     assert is_recent(reading, now, timedelta(hours=3))
     assert not is_recent(reading, now + timedelta(hours=2), timedelta(hours=3))
+
+
+def test_delay_measures_from_the_scheduled_time_even_across_midnight():
+    on_time = datetime(2026, 10, 6, 17, 9, 34, tzinfo=timezone.utc)
+    next_day = datetime(2026, 10, 6, 2, 55, 20, tzinfo=timezone.utc)
+    assert delay("7 17 * * *", on_time) == timedelta(minutes=2, seconds=34) < MAX_DELAY
+    assert delay("7 17 * * *", next_day) == timedelta(hours=9, minutes=48, seconds=20) > MAX_DELAY
 
 
 def test_backfill_asks_for_a_retry_while_sources_are_missing():
