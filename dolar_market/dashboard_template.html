@@ -231,6 +231,7 @@ const TEXTS = {
     parallelLabel: "Paralelo",
     gapLabel: "Brecha",
     gapNote: "La brecha es cuánto está el paralelo por encima (+) o por debajo (−) del oficial, en porcentaje del oficial.",
+    gapZero: "La línea punteada es el oficial: el paralelo se mueve a su alrededor.",
     bolivianos: amount => `Bs ${amount}`,
     sinceYesterday: change => `${change} vs. ayer`,
     sameAsYesterday: "igual que ayer",
@@ -281,6 +282,7 @@ const TEXTS = {
     parallelLabel: "Parallel",
     gapLabel: "Gap",
     gapNote: "The gap is how far the parallel rate sits above (+) or below (−) the official one, as a percentage of the official.",
+    gapZero: "The dashed line is the official rate: the parallel moves around it.",
     bolivianos: amount => `Bs ${amount}`,
     sinceYesterday: change => `${change} vs. yesterday`,
     sameAsYesterday: "same as yesterday",
@@ -683,27 +685,32 @@ function drawLines(points) {
   svg.addEventListener("mouseleave", () => { crosshair.setAttribute("visibility", "hidden"); hideTooltip(); });
 }
 
-// One line: the gap between the parallel and the official rate at every reading.
+// The gap between the parallel and the official rate at every reading, drawn against
+// the official rate itself: a dashed line at zero that is always inside the scale.
 function drawGap() {
   const points = readings.map(r => ({ t: r.t, ms: Date.parse(r.t), gap: gapOf(r), official: officialOf(r), parallel: parallelOf(r) }))
     .filter(p => p.gap != null);
   if (points.length < 2) { historyPanel.innerHTML = `<p class="empty">${text().noGapData}</p>`; return; }
   const width = chartWidth(), height = CHART_HEIGHT;
   const margin = { top: 16, right: 70, bottom: 28, left: 60 };
-  const domain = yDomain(points.map(p => p.gap));
+  const domain = yDomain([0, ...points.map(p => p.gap)]);
   const percent = v => formatPercent(v, domain.step < 0.1 ? 2 : 1); // a fine grid needs the extra digit
   const firstMs = points[0].ms, last = points[points.length - 1];
   const x = ms => margin.left + (ms - firstMs) / (last.ms - firstMs || 1) * (width - margin.left - margin.right);
   const y = v => margin.top + (domain.max - v) / (domain.max - domain.min || 1) * (height - margin.top - margin.bottom);
   const line = points.map((p, i) => `${i ? "L" : "M"}${x(p.ms).toFixed(1)},${y(p.gap).toFixed(1)}`).join("");
+  // The official's label steps aside when the parallel's last value sits next to it.
+  const labelApart = 14, officialLabelY = Math.abs(y(last.gap) - y(0)) < labelApart ? y(last.gap) + (last.gap >= 0 ? labelApart : -labelApart) : y(0);
   historyPanel.innerHTML = `<svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"
       aria-label="${text().gapAria}">${yGridSvg(domain, y, margin.left, width - margin.right, percent)}${timeLabelsSvg(points, x, height - 8)}
+    <line x1="${margin.left}" x2="${width - margin.right}" y1="${y(0)}" y2="${y(0)}" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.9"/>
+    <text class="end-value" x="${width - margin.right + 10}" y="${officialLabelY + 4}" style="fill:var(--accent)">${text().official}</text>
     <path d="${line}" fill="none" stroke="var(--parallel)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
     <circle cx="${x(last.ms)}" cy="${y(last.gap)}" r="4.5" fill="var(--parallel)" stroke="var(--surface)" stroke-width="2"/>
     <text class="end-value" x="${width - margin.right + 10}" y="${y(last.gap) + 4}" style="fill:var(--parallel)">${percent(last.gap)}</text>
     <line id="crosshair" y1="${margin.top}" y2="${height - margin.bottom}" stroke="var(--axis)" stroke-width="1" visibility="hidden"/>
   </svg>
-  <p class="note">${text().gapNote}</p>`;
+  <p class="note">${text().gapNote} ${text().gapZero}</p>`;
   const svg = historyPanel.querySelector("svg"), crosshair = historyPanel.querySelector("#crosshair");
   svg.addEventListener("mousemove", e => {
     const box = svg.getBoundingClientRect(), mouseX = (e.clientX - box.left) * (width / box.width);
