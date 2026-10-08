@@ -428,13 +428,13 @@ def metric_html(label: str, value: float | None, color: str, text: Mapping[str, 
     )
 
 
-def deal_html(label: str, deal: Deal, note: str, color: str, text: Mapping[str, str]) -> str:
+def deal_html(label: str, deal: Deal, note: str, text: Mapping[str, str]) -> str:
     """A best-deal card: the price is the headline, the winning bank sits under it."""
     return (
         f'<td class="deal" valign="top" style="width:50%;padding:14px 16px;background:{PAGE};border:1px solid {GRID};'
         f'border-radius:8px">'
         f'<div class="deal-label" style="{SANS};font-size:13px;line-height:18px;color:{INK_2}">{label}</div>'
-        f'<div style="{MONO};font-size:26px;line-height:32px;color:{color};padding:4px 0 2px">'
+        f'<div style="{MONO};font-size:26px;line-height:32px;color:{ACCENT};padding:4px 0 2px">'
         f"Bs {fmt(deal.price, text)}</div>"
         f'<div style="{SANS};font-size:16px;line-height:22px;font-weight:700;color:{INK}">'
         f'{", ".join(deal.banks) or "—"}</div>'
@@ -446,12 +446,12 @@ def deals_html(cheapest: Deal, best_paying: Deal, gap: float | None, gap_count: 
     """Both cards side by side, and the average gap as a line of context under them."""
     return (
         f'<table {TABLE} width="100%" style="width:100%;table-layout:fixed"><tr>'
-        f'{deal_html(text["to_buy"], cheapest, text["to_buy_note"], SELL_COLOR, text)}'
+        f'{deal_html(text["to_buy"], cheapest, text["to_buy_note"], text)}'
         f'<td width="12" style="width:12px;font-size:0;line-height:0">&nbsp;</td>'
-        f'{deal_html(text["to_sell"], best_paying, text["to_sell_note"], BUY_COLOR, text)}'
+        f'{deal_html(text["to_sell"], best_paying, text["to_sell_note"], text)}'
         f"</tr></table>"
         f'<div style="{SANS};font-size:13px;line-height:19px;color:{INK_2};padding-top:12px">{text["average_gap"]}: '
-        f'<span style="{MONO};color:{INK}">Bs {fmt(gap, text)}</span> '
+        f'<span style="{MONO};color:{ACCENT}">Bs {fmt(gap, text)}</span> '
         f'({text["across_banks"].format(count=gap_count)})</div>'
     )
 
