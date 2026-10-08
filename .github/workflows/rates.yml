@@ -10,6 +10,11 @@ on:
     - cron: "7 11 * * *" # 07:07 Bolivia time (UTC-4)
     - cron: "7 23 * * *" # 19:07 Bolivia time
   workflow_dispatch:
+    inputs:
+      if_older_than:
+        description: Skip the reading when the latest one is under this many minutes old (empty always reads)
+        type: string
+        default: ""
   push:
     branches: [main]
     paths:
@@ -46,7 +51,8 @@ jobs:
         if: github.event_name != 'push'
         env:
           CRON: ${{ github.event.schedule }}
-        run: python -m dolar_market.scrape ${{ github.event_name == 'schedule' && '--if-older-than 120 --scheduled-by "$CRON"' || '' }}
+          MAX_AGE: ${{ github.event_name == 'schedule' && '120' || inputs.if_older_than }}
+        run: python -m dolar_market.scrape ${MAX_AGE:+--if-older-than "$MAX_AGE"} ${CRON:+--scheduled-by "$CRON"}
 
       - name: Save dataset
         if: github.event_name != 'push'

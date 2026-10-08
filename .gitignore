@@ -235,3 +235,6 @@ ignored/
 CLAUDE.local.md
 *.local.md
 share/
+
+# Apps Script project binding (clasp)
+.clasp.json

@@ -10,8 +10,7 @@
  *
  * Deleting these rows never changes who receives the email.
  *
- * Setup: in the spreadsheet open Extensions > Apps Script, paste this file, save,
- * then run `installTriggers` once and accept the permission prompt.
+ * Runs on the triggers that `installTriggers` (triggers.gs) creates.
  */
 
 const KEEP_UNSUBSCRIBED_DAYS = 3;
@@ -58,13 +57,4 @@ function cleanSubscribers() {
   // Bottom-up, so deleting a row does not shift the ones still to delete.
   doomed.reverse().forEach(rowNumber => sheet.deleteRow(rowNumber));
   console.log(`Deleted ${doomed.length} row(s).`);
-}
-
-/** Run once: cleans on every form submission and every day around 03:00. */
-function installTriggers() {
-  ScriptApp.getProjectTriggers()
-    .filter(trigger => trigger.getHandlerFunction() === "cleanSubscribers")
-    .forEach(trigger => ScriptApp.deleteTrigger(trigger));
-  ScriptApp.newTrigger("cleanSubscribers").forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet()).onFormSubmit().create();
-  ScriptApp.newTrigger("cleanSubscribers").timeBased().everyDays(1).atHour(3).create();
 }
