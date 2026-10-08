@@ -132,10 +132,9 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         "best_deal": "Mejor oferta de hoy",
         "to_buy": "Para comprar dólares",
         "to_buy_detail": "vende a Bs {price}, la venta más baja",
-        "to_buy_note": "la venta más baja",
+        "deal_at": "en {banks}",
         "to_sell": "Para vender tus dólares",
         "to_sell_detail": "compra a Bs {price}, la compra más alta",
-        "to_sell_note": "la compra más alta",
         "average_gap": "Diferencia media entre venta y compra",
         "across_banks": "en {count} bancos",
         "by_bank": "Compra y venta por banco",
@@ -167,10 +166,9 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         "best_deal": "Best deal today",
         "to_buy": "To buy dollars",
         "to_buy_detail": "sells at Bs {price}, the lowest sell",
-        "to_buy_note": "the lowest sell",
+        "deal_at": "at {banks}",
         "to_sell": "To sell your dollars",
         "to_sell_detail": "buys at Bs {price}, the highest buy",
-        "to_sell_note": "the highest buy",
         "average_gap": "Average gap between sell and buy",
         "across_banks": "across {count} banks",
         "by_bank": "Buy and sell by bank",
@@ -428,17 +426,17 @@ def metric_html(label: str, value: float | None, color: str, text: Mapping[str, 
     )
 
 
-def deal_html(label: str, deal: Deal, note: str, text: Mapping[str, str]) -> str:
-    """A best-deal card: the price is the headline, the winning bank sits under it."""
+def deal_html(label: str, deal: Deal, text: Mapping[str, str]) -> str:
+    """A best-deal card that reads as one sentence: what for, at what price, at which bank."""
+    banks = f'<span style="font-weight:700;color:{INK}">{", ".join(deal.banks) or "—"}</span>'
     return (
-        f'<td class="deal" valign="top" style="width:50%;padding:14px 16px;background:{PAGE};border:1px solid {GRID};'
-        f'border-radius:8px">'
+        f'<td class="deal" valign="top" style="width:50%;padding:12px 16px 14px;background:{PAGE};'
+        f'border:1px solid {GRID};border-radius:8px">'
         f'<div class="deal-label" style="{SANS};font-size:13px;line-height:18px;color:{INK_2}">{label}</div>'
-        f'<div style="{MONO};font-size:26px;line-height:32px;color:{ACCENT};padding:4px 0 2px">'
-        f"Bs {fmt(deal.price, text)}</div>"
-        f'<div style="{SANS};font-size:16px;line-height:22px;font-weight:700;color:{INK}">'
-        f'{", ".join(deal.banks) or "—"}</div>'
-        f'<div style="{SANS};font-size:12px;line-height:18px;color:{MUTED}">{note}</div></td>'
+        f'<div style="padding-top:2px"><span style="{MONO};font-size:26px;line-height:34px;color:{ACCENT};'
+        f'white-space:nowrap">Bs {fmt(deal.price, text)}</span> '
+        f'<span style="display:inline-block;{SANS};font-size:15px;line-height:22px;color:{INK_2}">'
+        f'{text["deal_at"].format(banks=banks)}</span></div></td>'
     )
 
 
@@ -446,9 +444,9 @@ def deals_html(cheapest: Deal, best_paying: Deal, gap: float | None, gap_count: 
     """Both cards side by side, and the average gap as a line of context under them."""
     return (
         f'<table {TABLE} width="100%" style="width:100%;table-layout:fixed"><tr>'
-        f'{deal_html(text["to_buy"], cheapest, text["to_buy_note"], text)}'
+        f'{deal_html(text["to_buy"], cheapest, text)}'
         f'<td width="12" style="width:12px;font-size:0;line-height:0">&nbsp;</td>'
-        f'{deal_html(text["to_sell"], best_paying, text["to_sell_note"], text)}'
+        f'{deal_html(text["to_sell"], best_paying, text)}'
         f"</tr></table>"
         f'<div style="{SANS};font-size:13px;line-height:19px;color:{INK_2};padding-top:12px">{text["average_gap"]}: '
         f'<span style="{MONO};color:{ACCENT}">Bs {fmt(gap, text)}</span> '
