@@ -111,6 +111,8 @@ PHONE_CSS = """@media only screen and (max-width:600px){
 .title{font-size:28px!important;line-height:32px!important}
 .rates{width:100%!important;margin-top:14px!important}
 .rate{width:50%!important;text-align:left!important;padding-left:0!important}
+.deal{padding:12px 10px!important}
+.deal-label{font-size:12px!important}
 .wide{display:none!important}
 .phone{display:table-row!important}
 .value{border-top:0!important;padding-top:2px!important}
@@ -130,8 +132,10 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         "best_deal": "Mejor oferta de hoy",
         "to_buy": "Para comprar dólares",
         "to_buy_detail": "vende a Bs {price}, la venta más baja",
+        "to_buy_note": "la venta más baja",
         "to_sell": "Para vender tus dólares",
         "to_sell_detail": "compra a Bs {price}, la compra más alta",
+        "to_sell_note": "la compra más alta",
         "average_gap": "Diferencia media entre venta y compra",
         "across_banks": "en {count} bancos",
         "by_bank": "Compra y venta por banco",
@@ -152,7 +156,7 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         ),
         "subscribed": "Recibes este correo porque te suscribiste.",
         "unsubscribe": "Darme de baja",
-        "subject": "Dólar Bolivia {date}: venta desde Bs {sell}, compra hasta Bs {buy}",
+        "subject": "Dólar Bolivia {date}",
     },
     "en": {
         "decimal": ".",
@@ -163,8 +167,10 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         "best_deal": "Best deal today",
         "to_buy": "To buy dollars",
         "to_buy_detail": "sells at Bs {price}, the lowest sell",
+        "to_buy_note": "the lowest sell",
         "to_sell": "To sell your dollars",
         "to_sell_detail": "buys at Bs {price}, the highest buy",
+        "to_sell_note": "the highest buy",
         "average_gap": "Average gap between sell and buy",
         "across_banks": "across {count} banks",
         "by_bank": "Buy and sell by bank",
@@ -185,7 +191,7 @@ TEXTS: Mapping[str, Mapping[str, str]] = {
         ),
         "subscribed": "You receive this email because you subscribed.",
         "unsubscribe": "Unsubscribe",
-        "subject": "Bolivia dollar {date}: sell from Bs {sell}, buy up to Bs {buy}",
+        "subject": "Bolivia dollar {date}",
     },
 }
 
@@ -422,20 +428,32 @@ def metric_html(label: str, value: float | None, color: str, text: Mapping[str, 
     )
 
 
-def column_html(label: str, headline: str, detail: str, headline_style: str) -> str:
+def deal_html(label: str, deal: Deal, note: str, color: str, text: Mapping[str, str]) -> str:
+    """A best-deal card: the price is the headline, the winning bank sits under it."""
     return (
-        f'<td valign="top" style="width:33.33%;padding:0 12px 0 0">'
-        f'<div style="{SANS};font-size:13px;line-height:18px;color:{INK_2}">{label}</div>'
-        f'<div style="{headline_style};color:{INK};padding:4px 0">{headline}</div>'
-        f'<div style="{SANS};font-size:13px;line-height:18px;color:{INK_2}">{detail}</div></td>'
+        f'<td class="deal" valign="top" style="width:50%;padding:14px 16px;background:{PAGE};border:1px solid {GRID};'
+        f'border-radius:8px">'
+        f'<div class="deal-label" style="{SANS};font-size:13px;line-height:18px;color:{INK_2}">{label}</div>'
+        f'<div style="{MONO};font-size:26px;line-height:32px;color:{color};padding:4px 0 2px">'
+        f"Bs {fmt(deal.price, text)}</div>"
+        f'<div style="{SANS};font-size:16px;line-height:22px;font-weight:700;color:{INK}">'
+        f'{", ".join(deal.banks) or "—"}</div>'
+        f'<div style="{SANS};font-size:12px;line-height:18px;color:{MUTED}">{note}</div></td>'
     )
 
 
-def deal_html(label: str, deal: Deal, detail: str, text: Mapping[str, str]) -> str:
-    """A best-deal column: the winning bank is the headline, its price the detail."""
-    headline = ", ".join(deal.banks) or "—"
-    style = f"{SANS};font-size:20px;line-height:26px;font-weight:700"
-    return column_html(label, headline, detail.format(price=fmt(deal.price, text)), style)
+def deals_html(cheapest: Deal, best_paying: Deal, gap: float | None, gap_count: int, text: Mapping[str, str]) -> str:
+    """Both cards side by side, and the average gap as a line of context under them."""
+    return (
+        f'<table {TABLE} width="100%" style="width:100%;table-layout:fixed"><tr>'
+        f'{deal_html(text["to_buy"], cheapest, text["to_buy_note"], SELL_COLOR, text)}'
+        f'<td width="12" style="width:12px;font-size:0;line-height:0">&nbsp;</td>'
+        f'{deal_html(text["to_sell"], best_paying, text["to_sell_note"], BUY_COLOR, text)}'
+        f"</tr></table>"
+        f'<div style="{SANS};font-size:13px;line-height:19px;color:{INK_2};padding-top:12px">{text["average_gap"]}: '
+        f'<span style="{MONO};color:{INK}">Bs {fmt(gap, text)}</span> '
+        f'({text["across_banks"].format(count=gap_count)})</div>'
+    )
 
 
 def legend_html(text: Mapping[str, str]) -> str:
@@ -535,7 +553,8 @@ def build(
     text = TEXTS.get(lang, TEXTS[DEFAULT_LANG])
     latest = readings[-1]
     previous = readings[-2].banks if len(readings) > 1 else {}
-    date = datetime.fromisoformat(latest.timestamp).strftime("%d/%m/%Y %H:%M")
+    taken = datetime.fromisoformat(latest.timestamp)
+    date = taken.strftime("%d/%m/%Y %H:%M")
     official, parallel = official_of(latest), parallel_of(latest)
     banks = priced_banks(latest)
     cheapest, best_paying = best_sell(banks), best_buy(banks)
@@ -543,16 +562,6 @@ def build(
     scale = scale_for([official, parallel, *(v for _, q in banks for v in (q.buy, q.sell))])
     lines = reference_lines(scale, ((official, ACCENT), (parallel, PARALLEL_COLOR)))
     rows = "".join(row_html(b, q, previous.get(b, NO_DATA), scale, lines, text) for b, q in banks)
-    deals = (
-        deal_html(text["to_buy"], cheapest, text["to_buy_detail"], text)
-        + deal_html(text["to_sell"], best_paying, text["to_sell_detail"], text)
-        + column_html(
-            text["average_gap"],
-            fmt(gap, text),
-            text["across_banks"].format(count=gap_count),
-            f"{MONO};font-size:22px;line-height:26px",
-        )
-    )
     html = f"""<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>{PHONE_CSS}</style></head>
@@ -577,7 +586,7 @@ def build(
 </td></tr>
 <tr><td class="pad" style="padding:24px 28px 0">
   <div style="{SANS};font-size:19px;line-height:24px;font-weight:700;color:{INK};padding-bottom:12px">{text["best_deal"]}</div>
-  <table {TABLE} width="100%" style="width:100%;table-layout:fixed"><tr>{deals}</tr></table>
+  {deals_html(cheapest, best_paying, gap, gap_count, text)}
 </td></tr>
 <tr><td class="pad" style="padding:28px 28px 0">
   <div style="{SANS};font-size:19px;line-height:24px;font-weight:700;color:{INK}">{text["by_bank"]}</div>
@@ -600,7 +609,7 @@ def build(
 </td></tr></table>
 </div>
 </body></html>"""
-    subject = text["subject"].format(date=date, sell=fmt(cheapest.price, text), buy=fmt(best_paying.price, text))
+    subject = text["subject"].format(date=taken.strftime("%d/%m/%Y"))
     return Email(subject, html, plain_text(latest, sources, text, date, dashboard_url, unsubscribe_url))
 
 
