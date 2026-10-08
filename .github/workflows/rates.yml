@@ -1,6 +1,6 @@
 name: Rates
 
-# Takes a reading three times a day, then rebuilds and publishes the dashboard.
+# Takes a reading twice a day, then rebuilds and publishes the dashboard.
 # A push that changes the data or the code (for example a backfill from a local
 # machine) skips the reading and only republishes the dashboard.
 
@@ -8,7 +8,6 @@ on:
   schedule:
     # A few minutes past the hour: GitHub delays or drops runs scheduled at :00.
     - cron: "7 11 * * *" # 07:07 Bolivia time (UTC-4)
-    - cron: "7 17 * * *" # 13:07 Bolivia time
     - cron: "7 23 * * *" # 19:07 Bolivia time
   workflow_dispatch:
   push:

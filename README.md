@@ -24,7 +24,7 @@ the parallel market.
 
 ![The board: reference rates, best deals, every bank on one scale, and the history chart](docs/dashboard.png)
 
-Prices are read three times a day, at 07:00, 13:00 and 19:00 (Bolivia time). The email
+Prices are read twice a day, at 07:00 and 19:00 (Bolivia time). The email
 summary goes out at 08:00.
 
 ## Where the prices come from

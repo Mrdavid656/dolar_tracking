@@ -35,7 +35,7 @@ DATA_URL = SITE_URL + CSV_PATH.name
 SITE_TITLE = "Pizarra del Dólar"
 SITE_DESCRIPTION = (
     "Compra y venta del dólar en los bancos de Bolivia, junto al oficial del BCB y el paralelo. "
-    "Actualizado tres veces al día."
+    "Actualizado dos veces al día."
 )
 MARKER = "/*DATA*/"
 CONTACT_EMAIL = "davidgemio98@gmail.com"

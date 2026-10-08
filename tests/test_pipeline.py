@@ -84,10 +84,10 @@ def test_is_recent():
 
 
 def test_delay_measures_from_the_scheduled_time_even_across_midnight():
-    on_time = datetime(2026, 10, 6, 17, 9, 34, tzinfo=timezone.utc)
-    next_day = datetime(2026, 10, 6, 2, 55, 20, tzinfo=timezone.utc)
-    assert delay("7 17 * * *", on_time) == timedelta(minutes=2, seconds=34) < MAX_DELAY
-    assert delay("7 17 * * *", next_day) == timedelta(hours=9, minutes=48, seconds=20) > MAX_DELAY
+    on_time = datetime(2026, 10, 5, 23, 7, 53, tzinfo=timezone.utc)
+    next_day = datetime(2026, 10, 7, 2, 19, 10, tzinfo=timezone.utc)
+    assert delay("7 23 * * *", on_time) == timedelta(seconds=53) < MAX_DELAY
+    assert delay("7 23 * * *", next_day) == timedelta(hours=3, minutes=12, seconds=10) > MAX_DELAY
 
 
 def test_backfill_asks_for_a_retry_while_sources_are_missing():
