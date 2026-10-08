@@ -103,7 +103,8 @@ HIDDEN = "display:none;mso-hide:all;"  # shown only where the phone rules below 
 # Phone layout. Inline styles draw the desktop email; these rules override them where
 # the reader honours media queries (the Gmail app does, Gmail in a phone's browser may
 # not, and then the desktop layout is shown). The header stacks into title, reading
-# and rates, and each bank's name moves to a line of its own above its chart.
+# and rates, each bank's name moves to a line of its own above its chart, and the
+# legend splits into two centred lines.
 PHONE_CSS = """@media only screen and (max-width:600px){
 .outer{padding:12px 6px!important}
 .pad{padding-left:18px!important;padding-right:18px!important}
@@ -114,6 +115,8 @@ PHONE_CSS = """@media only screen and (max-width:600px){
 .deal{padding:12px 10px!important}
 .deal-label{font-size:12px!important}
 .wide{display:none!important}
+.legend{text-align:center!important}
+.pair{display:block!important}
 .phone{display:table-row!important}
 .value{border-top:0!important;padding-top:2px!important}
 .track{width:auto!important}
@@ -433,10 +436,10 @@ def deal_html(label: str, deal: Deal, text: Mapping[str, str]) -> str:
         f'<td class="deal" valign="top" style="width:50%;padding:12px 16px 14px;background:{PAGE};'
         f'border:1px solid {GRID};border-radius:8px">'
         f'<div class="deal-label" style="{SANS};font-size:13px;line-height:18px;color:{INK_2}">{label}</div>'
-        f'<div style="padding-top:2px"><span style="{MONO};font-size:26px;line-height:34px;color:{ACCENT};'
-        f'white-space:nowrap">Bs {fmt(deal.price, text)}</span> '
-        f'<span style="display:inline-block;{SANS};font-size:15px;line-height:22px;color:{INK_2}">'
-        f'{text["deal_at"].format(banks=banks)}</span></div></td>'
+        f'<div style="{MONO};font-size:26px;line-height:34px;color:{ACCENT};padding-top:2px">'
+        f"Bs {fmt(deal.price, text)}</div>"
+        f'<div style="{SANS};font-size:15px;line-height:22px;color:{INK_2}">'
+        f'{text["deal_at"].format(banks=banks)}</div></td>'
     )
 
 
@@ -467,7 +470,13 @@ def legend_html(text: Mapping[str, str]) -> str:
         line_key(ACCENT, text["official"]),
         line_key(PARALLEL_COLOR, text["parallel"]),
     )
-    return f'<div style="{SANS};font-size:12px;line-height:20px;color:{INK_2}">{" &nbsp;&nbsp; ".join(keys)}</div>'
+    gap = " &nbsp;&nbsp; "
+    pairs = (gap.join(keys[:2]), gap.join(keys[2:]))
+    return (
+        f'<div class="legend" style="{SANS};font-size:12px;line-height:20px;color:{INK_2}">'
+        f'<span class="pair">{pairs[0]}</span><span class="wide">{gap}</span>'
+        f'<span class="pair">{pairs[1]}</span></div>'
+    )
 
 
 def notice_html(missing: Sequence[str], text: Mapping[str, str]) -> str:
