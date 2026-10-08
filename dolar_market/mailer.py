@@ -98,6 +98,26 @@ SANS = "font-family:'Segoe UI',Helvetica,Arial,sans-serif"
 MONO = "font-family:Consolas,'SF Mono',Menlo,'Courier New',monospace"
 LABEL = f"{SANS};font-size:11px;letter-spacing:1px;text-transform:uppercase;color:{MUTED}"
 TABLE = 'role="presentation" cellpadding="0" cellspacing="0" border="0"'
+HIDDEN = "display:none;mso-hide:all;"  # shown only where the phone rules below apply
+
+# Phone layout. Inline styles draw the desktop email; these rules override them where
+# the reader honours media queries (the Gmail app does, Gmail in a phone's browser may
+# not, and then the desktop layout is shown). The header stacks into title, reading
+# and rates, and each bank's name moves to a line of its own above its chart.
+PHONE_CSS = """@media only screen and (max-width:600px){
+.outer{padding:12px 6px!important}
+.pad{padding-left:18px!important;padding-right:18px!important}
+.stack{display:block!important;width:100%!important;white-space:normal!important}
+.title{font-size:28px!important;line-height:32px!important}
+.rates{width:100%!important;margin-top:14px!important}
+.rate{width:50%!important;text-align:left!important;padding-left:0!important}
+.wide{display:none!important}
+.phone{display:table-row!important}
+.value{border-top:0!important;padding-top:2px!important}
+.track{width:auto!important}
+.buy{text-align:left!important;padding-left:0!important}
+.sell{text-align:right!important;padding-right:0!important}
+}"""
 
 # User-facing text, one entry per language. Everything the reader sees lives here.
 TEXTS: Mapping[str, Mapping[str, str]] = {
@@ -352,21 +372,25 @@ def change_html(current: float | None, previous: float | None, text: Mapping[str
     return f'<div style="{MONO};font-size:11px;color:{MUTED}">{arrow} {fmt(abs(current - previous), text)}</div>'
 
 
-def number_cell(value, previous, align: str, text: Mapping[str, str]) -> str:
+def number_cell(value, previous, side: str, align: str, text: Mapping[str, str]) -> str:
     return (
-        f'<td width="62" align="{align}" style="width:62px;padding:10px 8px;border-top:1px solid {GRID};'
-        f'{MONO};font-size:14px;color:{INK}">{fmt(value, text)}{change_html(value, previous, text)}</td>'
+        f'<td class="value {side}" width="62" align="{align}" style="width:62px;padding:10px 8px;'
+        f'border-top:1px solid {GRID};{MONO};font-size:14px;color:{INK}">'
+        f"{fmt(value, text)}{change_html(value, previous, text)}</td>"
     )
 
 
 def row_html(bank: str, quote: Quote, previous: Quote, scale: Scale, lines: str, text) -> str:
+    """A bank's row. On phones its name is shown by the first row instead of the first cell."""
+    name = f"{SANS};font-size:14px;font-weight:600;color:{INK}"
     return (
-        f'<tr><td style="padding:10px 0;border-top:1px solid {GRID};{SANS};font-size:14px;font-weight:600;'
-        f'color:{INK}">{bank}</td>'
-        f'{number_cell(quote.buy, previous.buy, "right", text)}'
-        f'<td width="46%" style="width:46%;padding:10px 5px;border-top:1px solid {GRID}">'
+        f'<tr class="phone" style="{HIDDEN}"><td colspan="4" style="padding:10px 0 0;'
+        f'border-top:1px solid {GRID};{name}">{bank}</td></tr>'
+        f'<tr><td class="wide" style="padding:10px 0;border-top:1px solid {GRID};{name}">{bank}</td>'
+        f'{number_cell(quote.buy, previous.buy, "buy", "right", text)}'
+        f'<td class="value track" width="46%" style="width:46%;padding:10px 5px;border-top:1px solid {GRID}">'
         f"{track_html(quote, scale, lines)}</td>"
-        f'{number_cell(quote.sell, previous.sell, "left", text)}</tr>'
+        f'{number_cell(quote.sell, previous.sell, "sell", "left", text)}</tr>'
     )
 
 
@@ -383,16 +407,16 @@ def axis_html(scale: Scale, text: Mapping[str, str]) -> str:
 
 def header_row_html(scale: Scale, text: Mapping[str, str]) -> str:
     return (
-        f'<tr><td style="padding:0 0 8px;{LABEL}">{text["bank"]}</td>'
-        f'<td align="right" style="padding:0 8px 8px;{LABEL}">{text["buy"]}</td>'
+        f'<tr><td class="wide" style="padding:0 0 8px;{LABEL}">{text["bank"]}</td>'
+        f'<td class="buy" align="right" style="padding:0 8px 8px;{LABEL}">{text["buy"]}</td>'
         f'<td style="padding:0 5px 8px">{axis_html(scale, text)}</td>'
-        f'<td align="left" style="padding:0 8px 8px;{LABEL}">{text["sell"]}</td></tr>'
+        f'<td class="sell" align="left" style="padding:0 8px 8px;{LABEL}">{text["sell"]}</td></tr>'
     )
 
 
 def metric_html(label: str, value: float | None, color: str, text: Mapping[str, str]) -> str:
     return (
-        f'<td align="right" valign="bottom" style="padding-left:20px;white-space:nowrap">'
+        f'<td class="rate" align="right" valign="bottom" style="padding-left:20px;white-space:nowrap">'
         f'<div style="{LABEL}">{label}</div>'
         f'<div style="{MONO};font-size:28px;line-height:34px;color:{color}">{fmt(value, text)}</div></td>'
     )
@@ -529,35 +553,43 @@ def build(
             f"{MONO};font-size:22px;line-height:26px",
         )
     )
-    html = f"""<div style="margin:0;padding:0;background:{PAGE}">
-<table {TABLE} width="100%" bgcolor="{PAGE}" style="width:100%;background:{PAGE}"><tr><td align="center" style="padding:28px 12px">
+    html = f"""<!doctype html>
+<html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>{PHONE_CSS}</style></head>
+<body style="margin:0;padding:0;background:{PAGE}">
+<div style="margin:0;padding:0;background:{PAGE}">
+<table {TABLE} width="100%" bgcolor="{PAGE}" style="width:100%;background:{PAGE}"><tr><td class="outer" align="center" style="padding:28px 12px">
 <table {TABLE} width="640" style="width:100%;max-width:640px;background:{CARD};border:1px solid {GRID};border-radius:10px">
-<tr><td style="padding:28px 28px 0">
+<tr><td class="pad" style="padding:28px 28px 0">
   <table {TABLE} width="100%" style="width:100%"><tr>
-    <td valign="bottom">
-      <div style="{SANS};font-size:32px;line-height:36px;font-weight:800;letter-spacing:-0.5px;color:{INK}">{text["title"]}</div>
+    <td class="stack" valign="bottom">
+      <div class="title" style="{SANS};font-size:32px;line-height:36px;font-weight:800;letter-spacing:-0.5px;color:{INK}">{text["title"]}</div>
       <div style="{SANS};font-size:13px;line-height:19px;color:{INK_2};padding-top:6px">{text["reading"].format(date=date)}</div>
     </td>
-    {metric_html(text["official"], official, ACCENT, text)}
-    {metric_html(text["parallel"], parallel, PARALLEL_COLOR, text)}
+    <td class="stack" align="right" valign="bottom" style="width:1%;white-space:nowrap">
+      <table class="rates" {TABLE}><tr>
+        {metric_html(text["official"], official, ACCENT, text)}
+        {metric_html(text["parallel"], parallel, PARALLEL_COLOR, text)}
+      </tr></table>
+    </td>
   </tr></table>
   {blank(2, INK, "margin-top:16px;")}
 </td></tr>
-<tr><td style="padding:24px 28px 0">
+<tr><td class="pad" style="padding:24px 28px 0">
   <div style="{SANS};font-size:19px;line-height:24px;font-weight:700;color:{INK};padding-bottom:12px">{text["best_deal"]}</div>
   <table {TABLE} width="100%" style="width:100%;table-layout:fixed"><tr>{deals}</tr></table>
 </td></tr>
-<tr><td style="padding:28px 28px 0">
+<tr><td class="pad" style="padding:28px 28px 0">
   <div style="{SANS};font-size:19px;line-height:24px;font-weight:700;color:{INK}">{text["by_bank"]}</div>
   <div style="padding-top:6px">{legend_html(text)}</div>
 </td></tr>
-<tr><td style="padding:16px 28px 0">
+<tr><td class="pad" style="padding:16px 28px 0">
   <table {TABLE} width="100%" style="width:100%">
 {header_row_html(scale, text)}
 {rows}
   </table>
 </td></tr>
-<tr><td style="padding:14px 28px 22px;border-top:1px solid {GRID}">
+<tr><td class="pad" style="padding:14px 28px 22px;border-top:1px solid {GRID}">
   <div style="{SANS};font-size:12px;line-height:18px;color:{MUTED}">{text["note"]}</div>
   <div style="{SANS};font-size:12px;line-height:18px;color:{MUTED};padding-top:8px">{text["disclaimer"]}</div>
   {notice_html(missing_sources(latest, sources), text)}
@@ -566,7 +598,8 @@ def build(
 </table>
 {subscription_html(unsubscribe_url, text)}
 </td></tr></table>
-</div>"""
+</div>
+</body></html>"""
     subject = text["subject"].format(date=date, sell=fmt(cheapest.price, text), buy=fmt(best_paying.price, text))
     return Email(subject, html, plain_text(latest, sources, text, date, dashboard_url, unsubscribe_url))
 
