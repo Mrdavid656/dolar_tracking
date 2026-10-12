@@ -54,7 +54,7 @@ h1 { font-family: var(--display); font-stretch: 80%; font-weight: 800; font-size
 a.label, .bank a { color: inherit; text-decoration: none; }
 a.label { color: var(--muted); }
 a.label[href]:hover, a.label[href]:focus-visible, .bank a:hover, .bank a:focus-visible { text-decoration: underline; outline: none; }
-.bank a::after { content: " \2197"; color: var(--muted); font-size: 11px; }
+.bank a::after, a.label[href]::after { content: " \2197"; color: var(--muted); font-size: 11px; }
 
 .lang { display: inline-flex; border: 1px solid var(--axis); border-radius: 4px; overflow: hidden; }
 .lang button { font: inherit; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; padding: 4px 10px; border: 0; background: transparent; color: var(--ink-2); cursor: pointer; }
