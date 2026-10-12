@@ -38,7 +38,8 @@ the midpoint between its buy and sell prices.
 
 Every reading is kept in [`data/rates.csv`](data/rates.csv), one row per source, in
 bolivianos per dollar. You are welcome to use it; the latest copy can be downloaded from
-https://mrdavid656.github.io/dolar_tracking/rates.csv.
+https://mrdavid656.github.io/dolar_tracking/rates.csv. The same data is on Kaggle, refreshed
+daily: https://www.kaggle.com/datasets/davidgemioperedo/bolivia-usd-exchange-rates-banks-bcb-and-parallel.
 
 | column | meaning |
 |---|---|
