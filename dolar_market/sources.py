@@ -154,7 +154,7 @@ SOURCES: MappingProxyType[str, Source] = MappingProxyType(
         "Banco Unión": from_html(
             "https://www.bancounion.com.bo/",
             buy=rf"Compra BOB:\s*{NUM}",
-            sell=rf"Compra BOB:\s*[\d.,]+\s*/\s*Venta\s*{NUM}",
+            sell=rf"Compra BOB:\s*[\d.,]+\s*/\s*Venta:?\s*{NUM}",
             official=OFFICIAL,
         ),
         # Ganadero only publishes a reference sell value.
