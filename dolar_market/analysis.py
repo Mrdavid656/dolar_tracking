@@ -80,3 +80,29 @@ def failing_sources(readings: Sequence[Reading], sources: Iterable[str], thresho
         for name in sources
         if name in seen_before and all(name not in reading.banks for reading in recent)
     )
+
+
+def failing_fields(readings: Sequence[Reading], sources: Iterable[str], threshold: int = 3) -> tuple[str, ...]:
+    """Values ("Bank (sell)") empty in each of the last `threshold` readings.
+
+    Only values the source published at some earlier reading count, so a bank that
+    never publishes a buy price is not reported. Sources failing as a whole are left
+    to `failing_sources`.
+    """
+    recent = readings[-threshold:]
+    if len(recent) < threshold:
+        return ()
+    down = set(failing_sources(readings, sources, threshold))
+
+    def value(reading: Reading, name: str, field: str) -> float | None:
+        quote = reading.banks.get(name)
+        return getattr(quote, field) if quote else None
+
+    return tuple(
+        f"{name} ({field})"
+        for name in sources
+        if name not in down
+        for field in Quote._fields
+        if any(value(reading, name, field) is not None for reading in readings)
+        and all(value(reading, name, field) is None for reading in recent)
+    )

@@ -3,6 +3,7 @@ from dolar_market.analysis import (
     average_gap,
     best_buy,
     best_sell,
+    failing_fields,
     failing_sources,
     missing_sources,
     official_of,
@@ -75,3 +76,17 @@ def test_failing_sources_needs_consecutive_misses():
 def test_failing_sources_ignores_sources_never_seen():
     history = [reading("A"), reading("A"), reading("A")]
     assert failing_sources(history, ["A", "New"], threshold=3) == ()
+
+
+def test_failing_fields_reports_values_a_source_stopped_publishing():
+    full, partial = Quote(buy=10.0, sell=12.0), Quote(buy=10.0)
+    history = [Reading("t", {"A": full, "B": Quote(sell=12.0)})] + [
+        Reading("t", {"A": partial, "B": Quote(sell=12.0)}) for _ in range(3)
+    ]
+    assert failing_fields(history, ["A", "B"], threshold=3) == ("A (sell)",)
+    assert failing_fields(history[:3], ["A", "B"], threshold=3) == ()
+
+
+def test_failing_fields_leaves_missing_sources_to_failing_sources():
+    history = [reading("A", "B"), reading("A"), reading("A"), reading("A")]
+    assert failing_fields(history, ["A", "B"], threshold=3) == ()
