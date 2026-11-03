@@ -11,7 +11,10 @@
 # The tasks work in their own clone of the repository so they never touch a working
 # copy you are editing. Readings are taken at 07:07 and 19:07 Bolivia time;
 # the reading task starts once at 20 past, and backfill.ps1 itself retries every 20
-# minutes for 100 minutes while the reading is incomplete. The email goes out at
+# minutes for 100 minutes while the reading is incomplete. It starts again at 09:05,
+# a second chance for mornings when the session was not open at 07:20 (the task
+# needs it, and a start missed that way is not caught up); when the morning reading
+# is already complete, that run changes nothing. The email goes out at
 # 08:07; its task starts at 08:20 and email_backup.ps1 retries every 10 minutes for
 # 90 minutes while no recent reading is published. This computer's clock must be on
 # Bolivia time, and the email task needs the GitHub CLI (gh) signed in.
@@ -37,7 +40,7 @@ function New-ScriptAction($name) {
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RunOnlyIfNetworkAvailable `
     -ExecutionTimeLimit (New-TimeSpan -Hours 2)  # room for every retry
 
-$triggers = "07:20", "19:20" | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }
+$triggers = "07:20", "09:05", "19:20" | ForEach-Object { New-ScheduledTaskTrigger -Daily -At $_ }
 
 Register-ScheduledTask -TaskName $TaskName -Action (New-ScriptAction "backfill.ps1") -Trigger $triggers `
     -Settings $settings -Description "Backfills dollar rates that GitHub's servers cannot reach." -Force | Out-Null
